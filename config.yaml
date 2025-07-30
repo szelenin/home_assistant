@@ -1,0 +1,9 @@
+audio:
+  chunk_size: 512
+  sample_rate: 16000
+speech:
+  language: en-US
+  provider: vosk
+wake_word:
+  name: null
+  sensitivity: 0.5
