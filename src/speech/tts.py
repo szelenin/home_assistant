@@ -1,11 +1,35 @@
 import pyttsx3
+import sounddevice as sd
 from typing import Optional
 
 
 class TextToSpeech:
     def __init__(self):
         self.engine = None
+        self._check_audio_devices()
         self._initialize_engine()
+    
+    def _check_audio_devices(self):
+        """Check and display available audio devices."""
+        try:
+            devices = sd.query_devices()
+            print(f"🎵 Found {len(devices)} audio devices:")
+            
+            output_devices = []
+            for i, device in enumerate(devices):
+                if device['max_output_channels'] > 0:
+                    output_devices.append((i, device))
+                    print(f"  🔊 Output {i}: {device['name']} (channels: {device['max_output_channels']})")
+            
+            # Try to set default device like in test_tts_detailed.py
+            try:
+                sd.default.device = None  # Use system default
+                print("✅ Audio device configuration successful")
+            except Exception as e:
+                print(f"⚠️ Audio device configuration warning: {e}")
+                
+        except Exception as e:
+            print(f"❌ Audio device check failed: {e}")
     
     def _initialize_engine(self):
         """Initialize the TTS engine."""
