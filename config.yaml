@@ -7,3 +7,7 @@ speech:
 wake_word:
   name: null
   sensitivity: 0.5
+tts:
+  voice_id: "com.apple.voice.compact.en-US.Samantha"
+  rate: 150
+  volume: 1.0

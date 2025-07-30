@@ -1,13 +1,41 @@
 import pyttsx3
 import sounddevice as sd
+import yaml
+import os
 from typing import Optional
 
 
 class TextToSpeech:
-    def __init__(self):
+    def __init__(self, voice_id=None, rate=None, volume=None):
         self.engine = None
+        
+        # Load configuration from config.yaml
+        self.config = self._load_config()
+        
+        # Use provided parameters or fall back to config values
+        self.voice_id = voice_id or self.config.get('tts', {}).get('voice_id', "com.apple.voice.compact.en-US.Samantha")
+        self.rate = rate or self.config.get('tts', {}).get('rate', 150)
+        self.volume = volume or self.config.get('tts', {}).get('volume', 1.0)
+        
+        # Debug output
+        print(f"🔧 TTS Config loaded:")
+        print(f"   Voice ID: {self.voice_id}")
+        print(f"   Rate: {self.rate}")
+        print(f"   Volume: {self.volume}")
+        
         self._check_audio_devices()
         self._initialize_engine()
+    
+    def _load_config(self):
+        """Load configuration from config.yaml file."""
+        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config.yaml')
+        try:
+            with open(config_path, 'r') as file:
+                return yaml.safe_load(file)
+        except Exception as e:
+            print(f"⚠️ Warning: Could not load config.yaml: {e}")
+            print("   Using default TTS settings")
+            return {}
     
     def _check_audio_devices(self):
         """Check and display available audio devices."""
@@ -46,28 +74,134 @@ class TextToSpeech:
             return
         
         try:
-            # Set speech rate (words per minute) - matching working version
-            self.engine.setProperty('rate', 150)
+            # Set rate and volume BEFORE voice selection
+            self.engine.setProperty('rate', self.rate)
+            self.engine.setProperty('volume', self.volume)
             
-            # Set volume to maximum for testing
-            self.engine.setProperty('volume', 1.0)
-            
-            # Try to use a more natural voice if available
+            # Get all available voices first
             voices = self.engine.getProperty('voices')
             if voices:
-                # Prefer female voice if available, otherwise use first available
-                for voice in voices:
-                    if voice.gender and 'female' in voice.gender.lower():
-                        self.engine.setProperty('voice', voice.id)
-                        break
+                print(f"🎤 Found {len(voices)} available voices:")
+                for i, voice in enumerate(voices):
+                    gender = voice.gender if hasattr(voice, 'gender') else 'Unknown'
+                    languages = voice.languages if hasattr(voice, 'languages') else []
+                    print(f"  Voice {i}: {voice.name} (ID: {voice.id})")
+                    print(f"    Gender: {gender}")
+                    print(f"    Languages: {languages}")
+                
+                # Use specified voice or default selection
+                if self.voice_id:
+                    # Try to find the specified voice
+                    voice_found = False
+                    for voice in voices:
+                        if voice.id == self.voice_id:
+                            self.engine.setProperty('voice', voice.id)
+                            print(f"✅ Using specified voice: {voice.name}")
+                            voice_found = True
+                            break
+                    
+                    if not voice_found:
+                        print(f"⚠️ Specified voice ID '{self.voice_id}' not found, using default")
+                        self._select_default_voice(voices)
                 else:
-                    self.engine.setProperty('voice', voices[0].id)
+                    self._select_default_voice(voices)
+            
+            # Set rate and volume AGAIN after voice selection
+            self.engine.setProperty('rate', self.rate)
+            self.engine.setProperty('volume', self.volume)
+            
+            # Double-check and force the rate again
+            current_rate = self.engine.getProperty('rate')
+            if current_rate != self.rate:
+                print(f"⚠️ Rate mismatch: expected {self.rate}, got {current_rate}, forcing...")
+                self.engine.setProperty('rate', self.rate)
+                # Try one more time
+                if self.engine.getProperty('rate') != self.rate:
+                    print(f"⚠️ Rate still not set correctly. This is a known pyttsx3 limitation on macOS.")
                     
             # Print current settings for debugging
-            print(f"TTS configured - Rate: {self.engine.getProperty('rate')}, Volume: {self.engine.getProperty('volume')}")
+            final_rate = self.engine.getProperty('rate')
+            final_volume = self.engine.getProperty('volume')
+            print(f"TTS configured - Rate: {final_rate}, Volume: {final_volume}")
             
         except Exception as e:
             print(f"Failed to configure voice: {e}")
+    
+    def _select_default_voice(self, voices):
+        """Select default voice based on preferences."""
+        # Prefer female voice if available, otherwise use first available
+        for voice in voices:
+            if hasattr(voice, 'gender') and voice.gender and 'female' in voice.gender.lower():
+                self.engine.setProperty('voice', voice.id)
+                print(f"✅ Using female voice: {voice.name}")
+                return
+        
+        # If no female voice found, use the first available
+        if voices:
+            self.engine.setProperty('voice', voices[0].id)
+            print(f"✅ Using default voice: {voices[0].name}")
+    
+    def list_voices(self):
+        """List all available voices with details."""
+        if not self.engine:
+            print("❌ TTS engine not available")
+            return
+        
+        voices = self.engine.getProperty('voices')
+        if voices:
+            print(f"\n🎤 Available Voices ({len(voices)} total):")
+            for i, voice in enumerate(voices):
+                gender = voice.gender if hasattr(voice, 'gender') else 'Unknown'
+                languages = voice.languages if hasattr(voice, 'languages') else []
+                print(f"  {i+1}. {voice.name}")
+                print(f"     ID: {voice.id}")
+                print(f"     Gender: {gender}")
+                print(f"     Languages: {languages}")
+                print()
+        else:
+            print("❌ No voices found")
+    
+    def set_voice(self, voice_id):
+        """Set a specific voice by ID."""
+        if not self.engine:
+            print("❌ TTS engine not available")
+            return False
+        
+        try:
+            self.engine.setProperty('voice', voice_id)
+            print(f"✅ Voice set to: {voice_id}")
+            return True
+        except Exception as e:
+            print(f"❌ Failed to set voice: {e}")
+            return False
+    
+    def set_rate(self, rate):
+        """Set speech rate (words per minute)."""
+        if not self.engine:
+            print("❌ TTS engine not available")
+            return False
+        
+        try:
+            self.engine.setProperty('rate', rate)
+            print(f"✅ Speech rate set to: {rate} WPM")
+            return True
+        except Exception as e:
+            print(f"❌ Failed to set rate: {e}")
+            return False
+    
+    def set_volume(self, volume):
+        """Set volume (0.0 to 1.0)."""
+        if not self.engine:
+            print("❌ TTS engine not available")
+            return False
+        
+        try:
+            self.engine.setProperty('volume', volume)
+            print(f"✅ Volume set to: {volume}")
+            return True
+        except Exception as e:
+            print(f"❌ Failed to set volume: {e}")
+            return False
     
     def speak(self, text: str) -> bool:
         """
