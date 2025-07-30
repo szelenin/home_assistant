@@ -1,6 +1,6 @@
-# Raspberry Pi Voice Assistant
+# Home Assistant
 
-A lightweight, modular voice-controlled API orchestration system for Raspberry Pi that supports multiple languages and can intelligently call APIs based on natural language commands.
+A lightweight, modular voice-controlled API orchestration system that supports multiple languages and can intelligently call APIs based on natural language commands.
 
 ## 🎯 Project Overview
 
@@ -103,8 +103,8 @@ sudo apt install -y alsa-utils pulseaudio
 
 ### 2. Clone Repository
 ```bash
-git clone https://github.com/yourusername/pi-voice-assistant.git
-cd pi-voice-assistant
+git clone https://github.com/szelenin/home_assistant.git
+cd home_assistant
 ```
 
 ### 3. Python Environment
@@ -142,7 +142,7 @@ python download_wake_models.py
 ## 📁 Project Structure
 
 ```
-pi-voice-assistant/
+home_assistant/
 ├── README.md
 ├── requirements.txt
 ├── config.yaml                 # Configuration file
@@ -381,7 +381,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 📮 Support
 
 - Create an issue for bugs or feature requests
-- Check the [Wiki](https://github.com/yourusername/pi-voice-assistant/wiki) for detailed guides
+- Check the [Wiki](https://github.com/szelenin/home_assistant/wiki) for detailed guides
 - Join our [Discord community](https://discord.gg/yourlink)
 
 ## 🗺️ Roadmap
