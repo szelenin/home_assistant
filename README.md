@@ -1,21 +1,38 @@
 # Home Assistant
 
-A smart home automation project built with modern technologies to control and monitor your home devices.
+A Python-based voice-controlled home automation system with speech recognition and text-to-speech capabilities.
 
 ## Features
 
+- **Voice Control**: Speech recognition for hands-free operation
+- **Text-to-Speech**: Natural voice responses using system voices
+- **Wake Word Detection**: Customizable wake word for activation
+- **AI Integration**: ChatGPT integration for natural language understanding
 - **Device Management**: Control smart lights, thermostats, and other IoT devices
 - **Automation**: Create custom automation rules for your smart home
-- **Monitoring**: Real-time monitoring of home sensors and devices
-- **User Interface**: Modern web-based dashboard for easy control
+- **Configuration**: YAML-based configuration system
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js (v18 or higher)
-- npm or yarn package manager
+- Python 3.8 or higher
+- macOS (for voice features) or Linux
 - Git
+
+### System Dependencies
+
+**For macOS:**
+```bash
+# Install PortAudio (required for PyAudio)
+brew install portaudio
+```
+
+**For Ubuntu/Debian:**
+```bash
+# Install PortAudio
+sudo apt-get install portaudio19-dev python3-pyaudio
+```
 
 ### Installation
 
@@ -25,32 +42,109 @@ A smart home automation project built with modern technologies to control and mo
    cd home_assistant
    ```
 
-2. Install dependencies:
+2. Create and activate virtual environment:
    ```bash
-   npm install
+   python3 -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-3. Start the development server:
+3. Install Python dependencies:
    ```bash
-   npm run dev
+   pip install -r requirements.txt
    ```
 
-4. Open your browser and navigate to `http://localhost:3000`
+4. Configure the system:
+   ```bash
+   # Edit config.yaml to customize voice and speech settings
+   nano config.yaml
+   ```
+
+5. Run the application:
+   ```bash
+   python main.py
+   ```
+
+## Configuration
+
+### Voice Settings (`config.yaml`)
+
+```yaml
+tts:
+  voice_id: "com.apple.voice.compact.en-US.Samantha"  # Voice selection
+  rate: 150  # Speech rate (words per minute)
+  volume: 1.0  # Volume level (0.0 to 1.0)
+
+speech:
+  language: en-US  # Speech recognition language
+  provider: vosk  # Speech recognition provider
+
+wake_word:
+  name: null  # Custom wake word (null for default)
+  sensitivity: 0.5  # Wake word sensitivity
+```
+
+### Available Voices
+
+The system supports various voices depending on your OS:
+
+**macOS Voices:**
+- `com.apple.voice.compact.en-US.Samantha` (Female, US English)
+- `com.apple.voice.compact.en-US.Alex` (Male, US English)
+- `com.apple.voice.compact.en-GB.Daniel` (Male, UK English)
+
+## Testing
+
+### Test Speech Recognition
+```bash
+python tests/test_recognizer.py
+```
+
+### Test Text-to-Speech
+```bash
+python tests/test_tts.py
+```
+
+### Test Configuration Loading
+```bash
+python test_config_loading.py
+```
 
 ## Project Structure
 
 ```
 home_assistant/
-├── README.md
-├── package.json
+├── config.yaml              # Main configuration file
+├── main.py                  # Application entry point
+├── requirements.txt         # Python dependencies
 ├── src/
-│   ├── components/
-│   ├── pages/
+│   ├── speech/
+│   │   ├── recognizer.py   # Speech recognition
+│   │   └── tts.py         # Text-to-speech
 │   ├── utils/
-│   └── styles/
-├── public/
+│   │   ├── config.py      # Configuration management
+│   │   └── name_collector.py
+│   └── modules/
+│       ├── chatgpt.py     # AI integration
+│       └── chatgpt_showcase.py
+├── tests/
+│   ├── test_recognizer.py # Speech recognition tests
+│   ├── test_tts.py        # TTS tests
+│   └── test_config.py     # Configuration tests
 └── docs/
+    └── high level design.md
 ```
+
+## Troubleshooting
+
+### Speech Recognition Issues
+- **"Could not find PyAudio"**: Install PortAudio first, then PyAudio
+- **Microphone not working**: Check system permissions and microphone settings
+- **Speech not recognized**: Ensure good microphone quality and clear speech
+
+### Text-to-Speech Issues
+- **No sound**: Check audio device settings and volume
+- **Wrong voice**: Update `voice_id` in `config.yaml`
+- **Rate issues**: Adjust `rate` setting in `config.yaml`
 
 ## Contributing
 
