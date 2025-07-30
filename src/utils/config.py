@@ -1,11 +1,13 @@
 import yaml
 import os
 from typing import Dict, Any, Optional
+from .logger import setup_logging
 
 
 class ConfigManager:
     def __init__(self, config_path: str = "config.yaml"):
         self.config_path = config_path
+        self.logger = setup_logging("home_assistant.config")
         self._config = self._load_config()
     
     def _load_config(self) -> Dict[str, Any]:
@@ -17,7 +19,7 @@ class ConfigManager:
             with open(self.config_path, 'r') as file:
                 return yaml.safe_load(file) or {}
         except Exception as e:
-            print(f"Error loading config: {e}")
+            self.logger.error(f"Error loading config: {e}")
             return {}
     
     def _create_default_config(self):
@@ -62,4 +64,4 @@ class ConfigManager:
                 yaml.dump(config, file, default_flow_style=False, indent=2)
             self._config = config
         except Exception as e:
-            print(f"Error saving config: {e}")
+            self.logger.error(f"Error saving config: {e}")

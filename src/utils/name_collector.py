@@ -3,12 +3,14 @@ import time
 from typing import Optional, List
 from ..speech.tts import TextToSpeech
 from ..speech.recognizer import SpeechRecognizer
+from .logger import setup_logging
 
 
 class NameCollector:
     def __init__(self):
         self.tts = TextToSpeech()
         self.recognizer = SpeechRecognizer()
+        self.logger = setup_logging("home_assistant.name_collector")
         
         self.funny_prompts = [
             "It seems like you forgot to give me a name. What is my name?",
@@ -33,7 +35,7 @@ class NameCollector:
         Returns:
             Optional[str]: The collected name, or None if failed
         """
-        print("Starting name collection process...")
+        self.logger.info("Starting name collection process...")
         
         # First attempt - polite
         self.tts.speak("What is my name?")
@@ -47,7 +49,7 @@ class NameCollector:
         max_attempts = 50  # Prevent infinite loop
         
         while attempts < max_attempts:
-            print(f"Waiting {timeout_minutes} minutes before asking again...")
+            self.logger.info(f"Waiting {timeout_minutes} minutes before asking again...")
             time.sleep(timeout_minutes * 60)  # Convert to seconds
             
             # Select a random funny prompt
@@ -60,7 +62,7 @@ class NameCollector:
             
             attempts += 1
         
-        print("Max attempts reached. Giving up on name collection.")
+        self.logger.warning("Max attempts reached. Giving up on name collection.")
         return None
     
     def _listen_for_name(self) -> Optional[str]:
@@ -71,7 +73,7 @@ class NameCollector:
             Optional[str]: The recognized name, or None if not recognized
         """
         if not self.recognizer.is_available():
-            print("Speech recognizer not available")
+            self.logger.error("Speech recognizer not available")
             return None
         
         success, text = self.recognizer.listen_for_speech(timeout=30, phrase_timeout=10)

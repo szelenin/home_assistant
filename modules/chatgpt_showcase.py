@@ -1,78 +1,83 @@
 #!/usr/bin/env python3
 """
-ChatGPT Showcase - Main Entry Point
+ChatGPT Showcase - Demo of ChatGPT Integration
 
-This script demonstrates the ChatGPT module functionality.
+This script demonstrates the ChatGPT module functionality
+and provides a simple interface for testing.
 """
 
-import sys
 import os
+import sys
+import time
 
-# Add parent directory to Python path to import modules
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
-from modules.chatgpt import ChatGPT
+# Add src directory to Python path for logger import
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+from utils.logger import setup_logging
+from chatgpt import ChatGPT
 
 
 def main():
-    """Main function to demonstrate ChatGPT functionality."""
-    print("🤖 ChatGPT Showcase Starting...")
+    logger = setup_logging("home_assistant.chatgpt_showcase")
+    logger.info("ChatGPT Showcase Starting...")
+    
+    # Initialize ChatGPT
+    chatgpt = ChatGPT()
+    
+    # Configure ChatGPT
+    chatgpt.model("gpt-4")
+    chatgpt.customiseResponse({
+        "temperature": 0.7,
+        "max_tokens": 150
+    })
+    
+    # Check for API key
+    api_key = os.getenv('OPENAI_API_KEY')
+    if not api_key:
+        logger.warning("No real API key found. Running in demo mode...")
+        logger.info("To test with real API, set OPENAI_API_KEY environment variable")
+        logger.info("Demo mode will show the structure without making API calls")
+        
+        logger.info("ChatGPT Module Structure:")
+        logger.info("Model: gpt-4")
+        logger.info("Temperature: 0.7")
+        logger.info("Message logging: Enabled")
+        logger.info("Auto-cleanup: 30 days")
+        
+        logger.info("Example prompt: 'What's the capital of France?'")
+        logger.info("Expected response: 'The capital of France is Paris.'")
+        
+        logger.info("ChatGPT showcase completed successfully!")
+        return
+    
+    # Set API token
+    chatgpt.token(api_key)
     
     try:
-        # Initialize ChatGPT
-        gpt = ChatGPT()
+        logger.info("Testing ChatGPT with a simple question...")
+        response = chatgpt.prompt("What's the capital of France?")
+        logger.info(f"Response: {response}")
         
-        # Check if we have a real API key or should use demo mode
-        api_key = os.getenv('OPENAI_API_KEY', 'your-api-key')
-        
-        if api_key == 'your-api-key':
-            print("⚠️  No real API key found. Running in demo mode...")
-            print("📝 To test with real API, set OPENAI_API_KEY environment variable")
-            print("🔧 Demo mode will show the structure without making API calls")
-            
-            # Demo mode - show the structure
-            print("\n📋 ChatGPT Module Structure:")
-            print("✅ Model: gpt-4")
-            print("✅ Temperature: 0.7")
-            print("✅ Message logging: Enabled")
-            print("✅ Auto-cleanup: 30 days")
-            
-            print("\n🎯 Example prompt: 'What's the capital of France?'")
-            print("🤖 Expected response: 'The capital of France is Paris.'")
-            
-            print("\n✅ ChatGPT showcase completed successfully!")
-            return
-        
-        # Configure the model with real API key
-        gpt.token(api_key)
-        gpt.model("gpt-4")
-        gpt.customiseResponse({"temperature": 0.7})
-        
-        # Test the model
-        print("📝 Testing ChatGPT with a simple question...")
-        response = gpt.prompt("What's the capital of France?")
-        print(f"🤖 Response: {response}")
-        
-        # Clean up old messages
-        print("🧹 Cleaning up old messages...")
-        gpt.clearMessages()  # Will also delete logs older than 1 month
-        
-        print("✅ ChatGPT showcase completed successfully!")
+        # Test cleanup
+        logger.info("Cleaning up old messages...")
+        chatgpt.clearMessages()
+        logger.info("ChatGPT showcase completed successfully!")
         
     except Exception as e:
-        print(f"❌ Error in ChatGPT showcase: {e}")
-        if "API key" in str(e):
-            print("\n💡 Tip: Set your OpenAI API key as environment variable:")
-            print("   export OPENAI_API_KEY='your-actual-api-key'")
-        sys.exit(1)
+        logger.error(f"Error in ChatGPT showcase: {e}")
+        
+        logger.info("Tip: Set your OpenAI API key as environment variable:")
+        logger.info("export OPENAI_API_KEY='your-actual-api-key'")
+        
+    except KeyboardInterrupt:
+        logger.info("ChatGPT showcase interrupted by user")
 
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        print("\n🛑 ChatGPT showcase interrupted by user")
-        sys.exit(0)
+        logger = setup_logging("home_assistant.chatgpt_showcase")
+        logger.info("ChatGPT showcase interrupted by user")
     except Exception as e:
-        print(f"💥 Fatal error: {e}")
-        sys.exit(1)
+        logger = setup_logging("home_assistant.chatgpt_showcase")
+        logger.critical(f"Fatal error: {e}")

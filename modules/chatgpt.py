@@ -2,6 +2,11 @@ import os
 import openai
 from datetime import datetime, timedelta
 import json
+import sys
+
+# Add src directory to Python path for logger import
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+from utils.logger import setup_logging
 
 class ChatGPT:
     def __init__(self):
@@ -11,6 +16,7 @@ class ChatGPT:
         self.customizations = {}
         self.log_path = "./messages.msg"
         self.client = None
+        self.logger = setup_logging("home_assistant.chatgpt")
         os.makedirs(os.path.dirname(self.log_path), exist_ok=True)
         if not os.path.exists(self.log_path):
             open(self.log_path, 'w').close()
@@ -44,6 +50,7 @@ class ChatGPT:
             self._log_message(user_prompt, reply)
             return reply
         except Exception as e:
+            self.logger.error(f"OpenAI API error: {e}")
             raise Exception(f"OpenAI API error: {e}")
 
     def clearMessages(self):
