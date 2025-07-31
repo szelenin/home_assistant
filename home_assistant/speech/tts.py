@@ -219,12 +219,29 @@ class TextToSpeech:
             text = text.replace(",", "")
             
             self.logger.info(f"Speaking: {text}")
+            
+            # Stop any previous speech and reset engine
+            try:
+                self.engine.stop()
+            except:
+                pass  # Ignore errors if engine is already stopped
+            
+            # Set properties again to ensure they're applied
+            self.engine.setProperty('rate', self.rate)
+            self.engine.setProperty('volume', self.volume)
+            
+            # Speak the text
             self.engine.say(text)
             self.engine.runAndWait()
-            # Add engine.stop() like in working version
-            self.engine.stop()
+            
             self.logger.info("TTS completed successfully")
             return True
         except Exception as e:
             self.logger.error(f"Failed to speak text: {e}")
+            # Try to reinitialize engine on error
+            try:
+                self._initialize_engine()
+                self._configure_voice()
+            except Exception as reinit_error:
+                self.logger.error(f"Failed to reinitialize engine: {reinit_error}")
             return False

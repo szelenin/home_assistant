@@ -125,12 +125,17 @@ class IntegrationScenarios:
         ]
         
         success_count = 0
-        for question, expected_response in conversation:
+        for i, (question, expected_response) in enumerate(conversation, 1):
             print(f"\n🎤 Assistant: {question}")
+            print(f"   (Speaking question {i}/{len(conversation)})")
             
             # Speak the question
             if self.tts.speak(question):
                 print("✅ Question spoken")
+                
+                # Pause to let user hear the question clearly
+                print("   Waiting 3 seconds for you to hear the question...")
+                time.sleep(3)
                 
                 # Listen for response
                 print("🎤 Listening for response...")
@@ -257,4 +262,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main() 
+    # main() 
+    scenarios = IntegrationScenarios()
+    scenarios.scenario_conversation_flow()
