@@ -56,6 +56,27 @@ class TextToSpeech:
                 
         except Exception as e:
             self.logger.error(f"Audio device check failed: {e}")
+        
+        # Ensure system volume is adequate for TTS
+        self._ensure_system_volume()
+    
+    def _ensure_system_volume(self):
+        """Ensure system volume is adequate for TTS."""
+        try:
+            import subprocess
+            # Check current system volume
+            result = subprocess.run(['osascript', '-e', 'output volume of (get volume settings)'], 
+                                  capture_output=True, text=True)
+            current_volume = int(result.stdout.strip())
+            
+            # If volume is too low, increase it
+            if current_volume < 50:
+                subprocess.run(['osascript', '-e', 'set volume output volume 75'], 
+                              capture_output=True)
+                self.logger.info(f"System volume was {current_volume}%, increased to 75% for TTS")
+            
+        except Exception as e:
+            self.logger.warning(f"Could not adjust system volume: {e}")
     
     def _initialize_engine(self):
         """Initialize the TTS engine."""
@@ -220,19 +241,31 @@ class TextToSpeech:
             
             self.logger.info(f"Speaking: {text}")
             
-            # Stop any previous speech and reset engine
+            # Force stop any previous speech
             try:
                 self.engine.stop()
             except:
                 pass  # Ignore errors if engine is already stopped
             
+            # Force audio device check and volume reset
+            self._check_audio_devices()
+            
             # Set properties again to ensure they're applied
             self.engine.setProperty('rate', self.rate)
             self.engine.setProperty('volume', self.volume)
             
+            # Force volume to maximum for reliability
+            self.engine.setProperty('volume', 1.0)
+            
             # Speak the text
             self.engine.say(text)
             self.engine.runAndWait()
+            
+            # Force stop after speaking
+            try:
+                self.engine.stop()
+            except:
+                pass
             
             self.logger.info("TTS completed successfully")
             return True
