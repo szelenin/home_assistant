@@ -1,0 +1,26 @@
+# Core dependencies for Home Assistant
+PyYAML>=6.0
+pyttsx3>=2.90
+SpeechRecognition>=3.10.0
+pyaudio>=0.2.11  # Requires PortAudio system dependency
+sounddevice>=0.4.6  # For audio device management and TTS
+openai>=1.0.0  # For ChatGPT integration
+
+# Speech recognition engines (optional)
+vosk>=0.3.45        # For Vosk offline speech recognition
+pocketsphinx>=0.1.15 # For CMU Sphinx offline recognition
+openai-whisper>=20231117  # For OpenAI Whisper offline recognition
+
+# Cloud speech services (optional)
+google-cloud-speech>=2.21.0  # For Google Cloud Speech-to-Text
+azure-cognitiveservices-speech>=1.31.0  # For Azure Speech Services
+
+# Development and testing dependencies
+pytest>=7.0.0
+pytest-cov>=4.0.0
+black>=22.0.0
+flake8>=5.0.0
+
+# Note: This file includes ALL optional dependencies
+# Use requirements.txt for minimal installation
+# Use requirements-full.txt for complete feature set 

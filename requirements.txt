@@ -9,6 +9,8 @@ sounddevice>=0.4.6  # For audio device management and TTS
 # Optional dependencies for advanced speech recognition
 # google-cloud-speech  # For Google Speech-to-Text
 # openai-whisper      # For OpenAI Whisper
+# vosk>=0.3.45        # For Vosk offline speech recognition
+# pocketsphinx>=0.1.15 # For CMU Sphinx offline recognition
 
 # Development and testing dependencies
 # pytest>=7.0.0

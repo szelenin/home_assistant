@@ -11,6 +11,7 @@ A Python-based voice-controlled home automation system with speech recognition a
 - **Device Management**: Control smart lights, thermostats, and other IoT devices
 - **Automation**: Create custom automation rules for your smart home
 - **Configuration**: YAML-based configuration system
+- **Multi-Engine Speech Recognition**: Support for Google, Vosk, Sphinx, and Whisper
 
 ## Getting Started
 
@@ -50,7 +51,11 @@ sudo apt-get install portaudio19-dev python3-pyaudio
 
 3. Install Python dependencies:
    ```bash
+   # Minimal installation (Google Speech Recognition only)
    pip install -r requirements.txt
+   
+   # Full installation (all speech recognition engines)
+   pip install -r requirements-full.txt
    ```
 
 4. Configure the system:
@@ -76,12 +81,35 @@ tts:
 
 speech:
   language: en-US  # Speech recognition language
-  provider: vosk  # Speech recognition provider
+  recognition_engines:
+    - google  # Primary (requires internet)
+    - vosk    # Secondary (offline fallback)
+    - sphinx  # Tertiary (offline fallback)
 
 wake_word:
   name: null  # Custom wake word (null for default)
   sensitivity: 0.5  # Wake word sensitivity
 ```
+
+### Speech Recognition Engines
+
+The system supports multiple speech recognition engines with automatic fallback:
+
+**Online Engines:**
+- **Google Speech Recognition** (default) - High accuracy, requires internet
+- **Google Cloud Speech** - Enterprise-grade, requires API key
+- **Azure Speech Services** - Microsoft's speech recognition
+- **Amazon Transcribe** - AWS speech recognition
+
+**Offline Engines:**
+- **Vosk** - Fast, accurate offline recognition
+- **Sphinx** - CMU's offline speech recognition
+- **Whisper** - OpenAI's offline speech recognition
+
+**Engine Priority:**
+1. **Google** (online, best accuracy)
+2. **Vosk** (offline, good accuracy)
+3. **Sphinx** (offline, basic accuracy)
 
 ### Available Voices
 
@@ -99,9 +127,14 @@ The system supports various voices depending on your OS:
 python tests/test_recognizer.py
 ```
 
-### Test Text-to-Speech
+### Test Speech Recognition + TTS Integration
 ```bash
-python tests/test_tts.py
+python tests/test_recognizer_tts_integration.py
+```
+
+### Test Auto-Stop Recognition
+```bash
+python tests/test_recognizer_auto_stop.py
 ```
 
 ### Test Configuration Loading
