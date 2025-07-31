@@ -122,25 +122,91 @@ The system supports various voices depending on your OS:
 
 ## Testing
 
-### Test Speech Recognition
+### Scenario-Based Testing
+
+The project uses **scenario-based testing** for better organization and clarity. Each scenario tests specific functionality in a standardized way.
+
+#### Run All Scenarios
 ```bash
+python tests/run_scenarios.py
+```
+
+#### Run Specific Scenario Categories
+```bash
+# Test TTS functionality
+python tests/run_scenarios.py --scenario tts
+
+# Test speech recognition
+python tests/run_scenarios.py --scenario recognizer
+
+# Test integration between TTS and recognizer
+python tests/run_scenarios.py --scenario integration
+
+# Test name collection functionality
+python tests/run_scenarios.py --scenario name_collection
+```
+
+#### Individual Scenario Files
+```bash
+# Run individual scenario files directly
+python tests/scenarios/tts_scenarios.py
+python tests/scenarios/recognizer_scenarios.py
+python tests/scenarios/integration_scenarios.py
+python tests/scenarios/name_collection_scenarios.py
+```
+
+### Legacy Tests (Still Available)
+```bash
+# Original test files (for backward compatibility)
 python tests/test_recognizer.py
-```
-
-### Test Speech Recognition + TTS Integration
-```bash
+python tests/test_tts.py
 python tests/test_recognizer_tts_integration.py
+python tests/test_config.py
 ```
 
-### Test Auto-Stop Recognition
-```bash
-python tests/test_recognizer_auto_stop.py
+### Test Structure
+
+```
+tests/
+├── run_scenarios.py                    # Main test runner
+├── scenarios/                          # Scenario-based tests
+│   ├── __init__.py
+│   ├── tts_scenarios.py               # TTS test scenarios
+│   ├── recognizer_scenarios.py        # Speech recognition scenarios
+│   ├── integration_scenarios.py       # TTS + Recognizer integration
+│   └── name_collection_scenarios.py   # Name collection scenarios
+├── test_recognizer.py                 # Legacy recognizer tests
+├── test_tts.py                        # Legacy TTS tests
+├── test_recognizer_tts_integration.py # Legacy integration tests
+└── test_config.py                     # Configuration tests
 ```
 
-### Test Configuration Loading
-```bash
-python test_config_loading.py
-```
+### Scenario Categories
+
+**🎤 TTS Scenarios:**
+- Welcome message testing
+- Voice configuration
+- Short phrases
+- Long text handling
+
+**🎵 Recognizer Scenarios:**
+- Microphone initialization
+- Ambient noise adjustment
+- Single speech recognition
+- Continuous recognition
+- Engine fallback testing
+
+**🎤🎵 Integration Scenarios:**
+- Speak and listen (TTS → Recognizer)
+- Conversation flow simulation
+- Configuration testing
+- Error handling
+
+**📝 Name Collection Scenarios:**
+- Initial setup testing
+- Name collection flow
+- Configuration management
+- Error handling
 
 ## Project Structure
 
@@ -149,20 +215,37 @@ home_assistant/
 ├── config.yaml              # Main configuration file
 ├── main.py                  # Application entry point
 ├── requirements.txt         # Python dependencies
-├── src/
+├── requirements-full.txt    # All dependencies (including optional)
+├── setup.py                # Package installation script
+├── home_assistant/         # Main package
+│   ├── __init__.py
+│   ├── main.py            # Application entry point
 │   ├── speech/
-│   │   ├── recognizer.py   # Speech recognition
-│   │   └── tts.py         # Text-to-speech
+│   │   ├── __init__.py
+│   │   ├── recognizer.py  # Speech recognition
+│   │   └── tts.py        # Text-to-speech
 │   ├── utils/
-│   │   ├── config.py      # Configuration management
+│   │   ├── __init__.py
+│   │   ├── config.py     # Configuration management
+│   │   ├── logger.py     # Logging utilities
 │   │   └── name_collector.py
-│   └── modules/
-│       ├── chatgpt.py     # AI integration
-│       └── chatgpt_showcase.py
+│   ├── modules/
+│   │   └── __init__.py
+│   ├── chatgpt.py        # AI integration
+│   └── chatgpt_showcase.py
 ├── tests/
-│   ├── test_recognizer.py # Speech recognition tests
-│   ├── test_tts.py        # TTS tests
-│   └── test_config.py     # Configuration tests
+│   ├── run_scenarios.py   # Main test runner
+│   ├── scenarios/         # Scenario-based tests
+│   │   ├── __init__.py
+│   │   ├── tts_scenarios.py
+│   │   ├── recognizer_scenarios.py
+│   │   ├── integration_scenarios.py
+│   │   └── name_collection_scenarios.py
+│   ├── test_recognizer.py # Legacy tests
+│   ├── test_tts.py
+│   ├── test_recognizer_tts_integration.py
+│   └── test_config.py
+├── logs/                  # Application logs
 └── docs/
     └── high level design.md
 ```

@@ -3,16 +3,19 @@ from unittest.mock import Mock, patch, MagicMock
 
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from src.utils.name_collector import NameCollector
+# Add project root to Python path for imports
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+
+from home_assistant.utils.name_collector import NameCollector
 
 
 class TestNameCollector(unittest.TestCase):
     
     def setUp(self):
-        with patch('src.utils.name_collector.TextToSpeech'), \
-             patch('src.utils.name_collector.SpeechRecognizer'):
+        with patch('home_assistant.utils.name_collector.TextToSpeech'), \
+             patch('home_assistant.utils.name_collector.SpeechRecognizer'):
             self.name_collector = NameCollector()
     
     def test_extract_name_from_response_patterns(self):
@@ -64,11 +67,11 @@ class TestNameCollector(unittest.TestCase):
                 result = self.name_collector._is_positive_response(response)
                 self.assertFalse(result)
     
-    @patch('src.utils.name_collector.time.sleep')
+    @patch('home_assistant.utils.name_collector.time.sleep')
     def test_collect_name_success_first_try(self, mock_sleep):
         """Test successful name collection on first attempt."""
-        with patch('src.utils.name_collector.TextToSpeech') as mock_tts_class, \
-             patch('src.utils.name_collector.SpeechRecognizer') as mock_sr_class:
+        with patch('home_assistant.utils.name_collector.TextToSpeech') as mock_tts_class, \
+             patch('home_assistant.utils.name_collector.SpeechRecognizer') as mock_sr_class:
             
             mock_tts = Mock()
             mock_sr = Mock()
@@ -89,11 +92,11 @@ class TestNameCollector(unittest.TestCase):
             mock_tts.speak.assert_any_call("Did you say my name is Jarvis?")
             mock_tts.speak.assert_any_call("Great! I'll remember that my name is Jarvis.")
     
-    @patch('src.utils.name_collector.time.sleep')
+    @patch('home_assistant.utils.name_collector.time.sleep')
     def test_collect_name_retry_with_funny_prompt(self, mock_sleep):
         """Test name collection with retry using funny prompt."""
-        with patch('src.utils.name_collector.TextToSpeech') as mock_tts_class, \
-             patch('src.utils.name_collector.SpeechRecognizer') as mock_sr_class:
+        with patch('home_assistant.utils.name_collector.TextToSpeech') as mock_tts_class, \
+             patch('home_assistant.utils.name_collector.SpeechRecognizer') as mock_sr_class:
             
             mock_tts = Mock()
             mock_sr = Mock()
@@ -116,8 +119,8 @@ class TestNameCollector(unittest.TestCase):
     
     def test_collect_name_recognizer_unavailable(self):
         """Test name collection when speech recognizer is unavailable."""
-        with patch('src.utils.name_collector.TextToSpeech') as mock_tts_class, \
-             patch('src.utils.name_collector.SpeechRecognizer') as mock_sr_class:
+        with patch('home_assistant.utils.name_collector.TextToSpeech') as mock_tts_class, \
+             patch('home_assistant.utils.name_collector.SpeechRecognizer') as mock_sr_class:
             
             mock_tts = Mock()
             mock_sr = Mock()
@@ -133,8 +136,8 @@ class TestNameCollector(unittest.TestCase):
     
     def test_funny_prompts_exist(self):
         """Test that funny prompts are defined and not empty."""
-        with patch('src.utils.name_collector.TextToSpeech'), \
-             patch('src.utils.name_collector.SpeechRecognizer'):
+        with patch('home_assistant.utils.name_collector.TextToSpeech'), \
+             patch('home_assistant.utils.name_collector.SpeechRecognizer'):
             name_collector = NameCollector()
             
             self.assertIsInstance(name_collector.funny_prompts, list)
