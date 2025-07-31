@@ -3,7 +3,10 @@ audio:
   sample_rate: 16000
 speech:
   language: en-US
-  provider: vosk
+  recognition_engines:
+    - google  # Primary (requires internet)
+    - vosk    # Secondary (offline fallback)
+    - sphinx  # Tertiary (offline fallback)
 wake_word:
   name: null
   sensitivity: 0.5
