@@ -190,6 +190,14 @@ class IntegrationScenarios:
         else:
             print("❌ TTS should have failed with empty text")
         
+        # Test TTS with whitespace-only text
+        print("Testing TTS with whitespace-only text...")
+        success = self.tts.speak("   ")
+        if not success:
+            print("✅ TTS correctly handled whitespace-only text")
+        else:
+            print("❌ TTS should have failed with whitespace-only text")
+        
         # Test recognizer with no speech
         print("Testing recognizer with no speech (timeout)...")
         success, text = self.recognizer.listen_for_speech(timeout=2, phrase_timeout=1)

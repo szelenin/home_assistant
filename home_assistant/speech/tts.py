@@ -209,6 +209,11 @@ class TextToSpeech:
             self.logger.warning(f"TTS not available, would say: {text}")
             return False
         
+        # Validate input text
+        if not text or not text.strip():
+            self.logger.warning("Empty or whitespace-only text provided, skipping TTS")
+            return False
+        
         try:
             # Preprocess text like in working version
             text = text.replace(",", "")
