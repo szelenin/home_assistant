@@ -137,6 +137,14 @@ class IntegrationScenarios:
                 print("   Waiting 3 seconds for you to hear the question...")
                 time.sleep(3)
                 
+                # Reinitialize TTS after speech recognition to ensure clean state
+                if i > 1:  # Skip for first question
+                    print("   Reinitializing TTS for clean audio state...")
+                    try:
+                        self.tts = TextToSpeech()
+                    except Exception as e:
+                        print(f"   Warning: TTS reinitialization failed: {e}")
+                
                 # Listen for response
                 print("🎤 Listening for response...")
                 success, response = self.recognizer.listen_for_speech(timeout=5, phrase_timeout=3)
@@ -146,6 +154,10 @@ class IntegrationScenarios:
                     success_count += 1
                 else:
                     print("❌ No response received")
+                
+                # Add delay after speech recognition to let audio system settle
+                print("   Waiting 2 seconds for audio system to settle...")
+                time.sleep(2)
             else:
                 print("❌ Failed to speak question")
         
