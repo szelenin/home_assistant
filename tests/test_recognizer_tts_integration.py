@@ -10,17 +10,14 @@ import sys
 import os
 import time
 
-# Add src directory to Python path (from tests directory)
+# Add project root to Python path for imports
 current_dir = os.path.dirname(os.path.abspath(__file__))
-src_path = os.path.join(current_dir, '..', 'src')
-sys.path.insert(0, src_path)
+project_root = os.path.dirname(current_dir)
+sys.path.insert(0, project_root)
 
-# Import using the full path
-sys.path.insert(0, os.path.join(current_dir, '..'))
-
-from src.speech.recognizer import SpeechRecognizer
-from src.speech.tts import TextToSpeech
-from src.utils.logger import setup_logging
+from home_assistant.speech.recognizer import SpeechRecognizer
+from home_assistant.speech.tts import TextToSpeech
+from home_assistant.utils.logger import setup_logging
 
 
 def test_recognizer_tts_integration():

@@ -9,13 +9,13 @@ including wake word configuration.
 import sys
 import os
 
-# Add src directory to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+# Add current directory to Python path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from src.utils.config import ConfigManager
-from src.utils.name_collector import NameCollector
-from src.speech.tts import TextToSpeech
-from src.utils.logger import setup_logging
+from home_assistant.utils.config import ConfigManager
+from home_assistant.utils.name_collector import NameCollector
+from home_assistant.speech.tts import TextToSpeech
+from home_assistant.utils.logger import setup_logging
 
 
 def main():
