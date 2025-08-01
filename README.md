@@ -7,7 +7,9 @@ A Python-based voice-controlled home automation system with speech recognition a
 - **Voice Control**: Speech recognition for hands-free operation
 - **Text-to-Speech**: Natural voice responses using system voices
 - **Wake Word Detection**: Customizable wake word for activation
-- **AI Integration**: ChatGPT integration for natural language understanding
+- **AI Integration**: Claude (Anthropic) and ChatGPT (OpenAI) support with automatic fallback
+- **Intent Recognition**: Understands weather, device control, personal info, and general questions
+- **Natural Language Processing**: Translates commands to device API calls
 - **Device Management**: Control smart lights, thermostats, and other IoT devices
 - **Automation**: Create custom automation rules for your smart home
 - **Configuration**: YAML-based configuration system
@@ -51,20 +53,42 @@ sudo apt-get install portaudio19-dev python3-pyaudio
 
 3. Install Python dependencies:
    ```bash
-   # Minimal installation (Google Speech Recognition only)
+   # Install core dependencies including AI providers
    pip install -r requirements.txt
    
    # Full installation (all speech recognition engines)
    pip install -r requirements-full.txt
    ```
 
-4. Configure the system:
+4. Configure AI Provider (Required):
+   
+   The system uses AI providers for natural language understanding. You need at least one API key:
+
+   **Option A: Anthropic Claude (Recommended)**
+   - Sign up at [Anthropic Console](https://console.anthropic.com/)
+   - Go to [API Keys](https://console.anthropic.com/settings/keys) and create a new key
+   - Add credits to your account at [Billing](https://console.anthropic.com/settings/billing)
+   
+   **Option B: OpenAI ChatGPT**
+   - Sign up at [OpenAI Platform](https://platform.openai.com/)
+   - Go to [API Keys](https://platform.openai.com/api-keys) and create a new key
+   - Add billing information at [Billing](https://platform.openai.com/settings/organization/billing/overview)
+
+   **Add your API key to config.yaml:**
+   ```yaml
+   ai:
+     provider: "anthropic"  # or "openai"
+     anthropic_api_key: "your-anthropic-key-here"  # For Claude
+     openai_api_key: "your-openai-key-here"        # For ChatGPT
+   ```
+
+5. Configure other settings:
    ```bash
    # Edit config.yaml to customize voice and speech settings
    nano config.yaml
    ```
 
-5. Run the application:
+6. Run the application:
    ```bash
    python main.py
    ```

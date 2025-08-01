@@ -4,7 +4,9 @@ pyttsx3>=2.90
 SpeechRecognition>=3.10.0
 pyaudio>=0.2.11  # Requires PortAudio system dependency
 sounddevice>=0.4.6  # For audio device management and TTS
-# openai>=1.0.0  # For ChatGPT integration
+# AI Provider dependencies
+anthropic>=0.7.0  # For Claude AI integration (default provider)
+openai>=1.0.0     # For ChatGPT integration
 
 # Optional dependencies for advanced speech recognition
 # google-cloud-speech  # For Google Speech-to-Text
