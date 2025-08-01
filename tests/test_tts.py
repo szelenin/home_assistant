@@ -8,12 +8,12 @@ import os
 
 # Add src directory to Python path (from tests directory)
 current_dir = os.path.dirname(os.path.abspath(__file__))
-src_path = os.path.join(current_dir, '..', 'src')
-sys.path.insert(0, src_path)
+project_root = os.path.dirname(current_dir)
+sys.path.insert(0, project_root)
 
 # Import using the full path
 sys.path.insert(0, os.path.join(current_dir, '..'))
-from src.speech.tts import TextToSpeech
+from home_assistant.speech.tts import TextToSpeech
 
 def test_tts():
     print("Testing TTS functionality...")

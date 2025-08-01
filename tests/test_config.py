@@ -5,9 +5,12 @@ import yaml
 from unittest.mock import patch, mock_open
 
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from src.utils.config import ConfigManager
+# Add project root to Python path for imports
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+
+from home_assistant.utils.config import ConfigManager
 
 
 class TestConfigManager(unittest.TestCase):
