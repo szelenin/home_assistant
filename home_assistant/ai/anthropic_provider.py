@@ -70,7 +70,9 @@ class AnthropicProvider(BaseAIProvider):
             response_text = response.content[0].text if response.content else ""
             
             # Classify intent
-            intent = self.classify_intent(message)
+            # With the new API system, all responses are either API_CALL or CHAT
+            # The intent will be determined by whether the response is JSON API call format
+            intent = IntentType.CHAT  # Default to chat, will be updated if API call detected
             
             # Add to conversation history
             self.add_to_history(message, response_text)
@@ -97,40 +99,10 @@ class AnthropicProvider(BaseAIProvider):
             # Return fallback response
             return AIResponse(
                 text=f"I'm having trouble processing your request right now. Error: {str(e)}",
-                intent=IntentType.UNKNOWN,
+                intent=IntentType.CHAT,
                 confidence=0.1
             )
     
-    def classify_intent(self, message: str) -> IntentType:
-        """Classify message intent using keyword matching and patterns."""
-        message_lower = message.lower().strip()
-        
-        # Weather patterns
-        weather_keywords = ['weather', 'temperature', 'rain', 'sunny', 'cloudy', 'forecast']
-        if any(keyword in message_lower for keyword in weather_keywords):
-            return IntentType.WEATHER
-        
-        # Personal info patterns
-        if any(phrase in message_lower for phrase in ['what is your name', 'who are you', 'your name']):
-            return IntentType.PERSONAL_INFO
-        
-        # Device control patterns
-        device_keywords = ['turn on', 'turn off', 'switch', 'light', 'device', 'control']
-        if any(keyword in message_lower for keyword in device_keywords):
-            return IntentType.DEVICE_CONTROL
-        
-        # Time/date patterns
-        time_keywords = ['time', 'date', 'today', 'tomorrow', 'yesterday', 'when', 'schedule']
-        if any(keyword in message_lower for keyword in time_keywords):
-            return IntentType.TIME_DATE
-        
-        # Question patterns
-        question_words = ['what', 'how', 'why', 'where', 'when', 'who']
-        if any(message_lower.startswith(word) for word in question_words) or message_lower.endswith('?'):
-            return IntentType.QUESTION
-        
-        # Default to general chat
-        return IntentType.GENERAL_CHAT
     
     def is_available(self) -> bool:
         """Check if Anthropic provider is available."""

@@ -11,14 +11,10 @@ from enum import Enum
 
 
 class IntentType(Enum):
-    """Types of intents the AI can recognize."""
-    QUESTION = "question"
-    DEVICE_CONTROL = "device_control"
-    PERSONAL_INFO = "personal_info"
-    WEATHER = "weather"
-    TIME_DATE = "time_date"
-    GENERAL_CHAT = "general_chat"
-    UNKNOWN = "unknown"
+    """Simplified intent types for the decorator-based API system."""
+    API_CALL = "api_call"    # AI detected and wants to execute an API call
+    CHAT = "chat"            # Regular conversational response
+    UNKNOWN = "unknown"      # Fallback for errors
 
 
 @dataclass
@@ -65,18 +61,6 @@ class BaseAIProvider(ABC):
         """
         pass
     
-    @abstractmethod
-    def classify_intent(self, message: str) -> IntentType:
-        """
-        Classify the intent of a message.
-        
-        Args:
-            message: User's message
-            
-        Returns:
-            IntentType enum value
-        """
-        pass
     
     def add_to_history(self, user_message: str, ai_response: str):
         """Add message pair to conversation history."""
