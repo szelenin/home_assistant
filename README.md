@@ -64,6 +64,8 @@ sudo apt-get install portaudio19-dev python3-pyaudio
    
    The system uses AI providers for natural language understanding. You need at least one API key:
 
+   **Step 1: Get API Key**
+   
    **Option A: Anthropic Claude (Recommended)**
    - Sign up at [Anthropic Console](https://console.anthropic.com/)
    - Go to [API Keys](https://console.anthropic.com/settings/keys) and create a new key
@@ -74,13 +76,23 @@ sudo apt-get install portaudio19-dev python3-pyaudio
    - Go to [API Keys](https://platform.openai.com/api-keys) and create a new key
    - Add billing information at [Billing](https://platform.openai.com/settings/organization/billing/overview)
 
-   **Add your API key to config.yaml:**
-   ```yaml
-   ai:
-     provider: "anthropic"  # or "openai"
-     anthropic_api_key: "your-anthropic-key-here"  # For Claude
-     openai_api_key: "your-openai-key-here"        # For ChatGPT
+   **Step 2: Create AI Configuration**
+   ```bash
+   # Copy the template file
+   cp ai_config.example.yaml ai_config.yaml
+   
+   # Edit with your API keys
+   nano ai_config.yaml
    ```
+
+   **Step 3: Add your API keys to ai_config.yaml:**
+   ```yaml
+   # API Keys (replace with your actual keys)
+   anthropic_api_key: "your-anthropic-key-here"  # For Claude
+   openai_api_key: "your-openai-key-here"        # For ChatGPT
+   ```
+   
+   **Note**: `ai_config.yaml` is automatically ignored by git to keep your API keys secure.
 
 5. Configure other settings:
    ```bash

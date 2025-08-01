@@ -47,4 +47,7 @@ Thumbs.db
 
 # Project specific
 messages.msg
-*.msg 
+*.msg
+
+# AI Configuration (contains sensitive API keys)
+ai_config.yaml

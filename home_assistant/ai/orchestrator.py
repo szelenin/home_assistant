@@ -44,7 +44,7 @@ class AIOrchestrator:
     
     def _initialize_providers(self):
         """Initialize AI providers based on configuration."""
-        ai_config = self.config_manager.config.get('ai', {})
+        ai_config = self.config_manager.get_ai_config()
         provider_name = ai_config.get('provider', 'anthropic')
         
         try:
@@ -261,7 +261,7 @@ class AIOrchestrator:
         """Get status of all providers."""
         status = {}
         for name, provider_class in self.providers.items():
-            ai_config = self.config_manager.config.get('ai', {})
+            ai_config = self.config_manager.get_ai_config()
             try:
                 provider = provider_class(ai_config)
                 status[name] = provider.is_available()
@@ -284,14 +284,15 @@ class AIOrchestrator:
             return False
         
         try:
-            ai_config = self.config_manager.config.get('ai', {})
+            ai_config = self.config_manager.get_ai_config()
+            ai_config['provider'] = provider_name  # Update provider in config
             provider_class = self.providers[provider_name]
             new_provider = provider_class(ai_config)
             
             if new_provider.is_available():
                 self.current_provider = new_provider
-                # Update config
-                ai_config['provider'] = provider_name
+                # Update main config
+                self.config_manager.config['ai']['provider'] = provider_name
                 self.config_manager.save_config()
                 self.logger.info(f"Switched to provider: {provider_name}")
                 return True

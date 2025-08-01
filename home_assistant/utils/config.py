@@ -9,6 +9,7 @@ class ConfigManager:
         self.config_path = config_path
         self.logger = setup_logging("home_assistant.config")
         self._config = self._load_config()
+        self._ai_config = self._load_ai_config()
     
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from YAML file, create default if not exists."""
@@ -57,11 +58,62 @@ class ConfigManager:
         """Get the full configuration."""
         return self._config.copy()
     
-    def save_config(self, config: Dict[str, Any]):
+    def save_config(self, config: Dict[str, Any] = None):
         """Save configuration to YAML file."""
+        if config is None:
+            config = self._config
+        
         try:
             with open(self.config_path, 'w') as file:
                 yaml.dump(config, file, default_flow_style=False, indent=2)
             self._config = config
         except Exception as e:
             self.logger.error(f"Error saving config: {e}")
+    
+    def _load_ai_config(self) -> Dict[str, Any]:
+        """Load AI configuration from separate file."""
+        ai_config_file = self._config.get('ai', {}).get('config_file', 'ai_config.yaml')
+        
+        if not os.path.exists(ai_config_file):
+            self.logger.warning(f"AI config file not found: {ai_config_file}")
+            self.logger.info("Create ai_config.yaml from ai_config.example.yaml template")
+            return {}
+        
+        try:
+            with open(ai_config_file, 'r') as file:
+                ai_config = yaml.safe_load(file) or {}
+                self.logger.info(f"Loaded AI configuration from {ai_config_file}")
+                return ai_config
+        except Exception as e:
+            self.logger.error(f"Error loading AI config from {ai_config_file}: {e}")
+            return {}
+    
+    def get_ai_config(self) -> Dict[str, Any]:
+        """Get the AI configuration with provider-specific settings."""
+        if not self._ai_config:
+            return {}
+        
+        # Get current provider
+        provider = self._config.get('ai', {}).get('provider', 'anthropic')
+        
+        # Merge provider-specific config with API keys
+        ai_config = {
+            'provider': provider,
+            'anthropic_api_key': self._ai_config.get('anthropic_api_key'),
+            'openai_api_key': self._ai_config.get('openai_api_key')
+        }
+        
+        # Add provider-specific settings
+        if provider in self._ai_config:
+            ai_config.update(self._ai_config[provider])
+        
+        return ai_config
+    
+    def reload_ai_config(self):
+        """Reload AI configuration from file."""
+        self._ai_config = self._load_ai_config()
+    
+    @property
+    def config(self) -> Dict[str, Any]:
+        """Property to access the main configuration."""
+        return self._config

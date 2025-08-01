@@ -1,24 +1,19 @@
+ai:
+  config_file: ai_config.yaml
+  provider: anthropic
 audio:
   chunk_size: 512
   sample_rate: 16000
 speech:
   language: en-US
   recognition_engines:
-    - google  # Primary (requires internet)
-    - vosk    # Secondary (offline fallback)
-    - sphinx  # Tertiary (offline fallback)
-wake_word:
-  name: null
-  sensitivity: 0.5
+  - google
+  - vosk
+  - sphinx
 tts:
-  voice_id: "com.apple.voice.compact.en-US.Samantha"
   rate: 150
+  voice_id: com.apple.voice.compact.en-US.Samantha
   volume: 1.0
-ai:
-  provider: "anthropic"  # Options: anthropic, openai
-  anthropic_api_key: null  # Set your Anthropic API key here
-  openai_api_key: null     # Set your OpenAI API key here
-  model: "claude-3-5-sonnet-20241022"  # Default model for anthropic
-  max_tokens: 1000
-  temperature: 0.7
-  max_history_length: 10
+wake_word:
+  name: TestAssistant
+  sensitivity: 0.5
