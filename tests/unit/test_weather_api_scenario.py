@@ -7,15 +7,8 @@ User: "what is the weather today in Tampa?"
 Expected: get_weather(location="Tampa", units="metric", days=1)
 """
 
-import sys
-import os
 import unittest
 from unittest.mock import Mock, patch, MagicMock
-
-# Add project root to Python path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(os.path.dirname(current_dir))
-sys.path.insert(0, project_root)
 
 from home_assistant.apis.decorators import APIRegistry
 from home_assistant.apis.executor import APIExecutor, APICall

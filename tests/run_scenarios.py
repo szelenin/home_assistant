@@ -14,10 +14,10 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(current_dir)
 sys.path.insert(0, project_root)
 
-from scenarios.tts_scenarios import TTSScenarios
-from scenarios.recognizer_scenarios import RecognizerScenarios
-from scenarios.integration_scenarios import IntegrationScenarios
-from scenarios.name_collection_scenarios import NameCollectionScenarios
+from integration.tts_scenarios import TTSScenarios
+from integration.recognizer_scenarios import RecognizerScenarios
+from integration.integration_scenarios import IntegrationScenarios
+from integration.name_collection_scenarios import NameCollectionScenarios
 
 
 def run_all_scenarios():
