@@ -6,11 +6,13 @@ from dataclasses import dataclass
 
 @dataclass
 class APIDefinition:
-    name: str
-    description: str
-    method: Callable
-    parameters: Dict[str, Dict[str, Any]]
-    trigger_words: List[str]
+    """Definition of a registered API method with metadata for AI detection and execution."""
+    
+    name: str  # Human-readable name of the API (e.g., "Weather Information")
+    description: str  # Description of what the API does for AI context
+    method: Callable  # The actual Python method to execute
+    parameters: Dict[str, Dict[str, Any]]  # Parameter metadata: {param_name: {type, required, default, description}}
+    trigger_words: List[str]  # Keywords that might indicate this API should be used
 
 
 class APIRegistry:
