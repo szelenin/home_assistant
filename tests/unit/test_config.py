@@ -2,7 +2,7 @@ import unittest
 import tempfile
 import os
 import yaml
-from unittest.mock import patch, mock_open
+from unittest.mock import patch, mock_open, Mock
 
 from home_assistant.utils.config import ConfigManager
 
@@ -71,24 +71,32 @@ class TestConfigManager(unittest.TestCase):
         self.assertIn('audio', config)
     
     @patch('builtins.open', side_effect=IOError("File error"))
-    @patch('builtins.print')
-    def test_error_handling_load(self, mock_print, mock_open):
+    @patch('home_assistant.utils.config.setup_logging')
+    def test_error_handling_load(self, mock_setup_logging, mock_open):
         """Test error handling when loading config fails."""
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+        
         config_manager = ConfigManager(self.config_path)
         config = config_manager.get_config()
         
         # Should return empty dict on error
         self.assertEqual(config, {})
-        mock_print.assert_called()
+        # Should log the error
+        mock_logger.error.assert_called()
     
     @patch('yaml.dump', side_effect=IOError("Write error"))
-    @patch('builtins.print')
-    def test_error_handling_save(self, mock_print, mock_dump):
+    @patch('home_assistant.utils.config.setup_logging')
+    def test_error_handling_save(self, mock_setup_logging, mock_dump):
         """Test error handling when saving config fails."""
+        mock_logger = Mock()
+        mock_setup_logging.return_value = mock_logger
+        
         config_manager = ConfigManager(self.config_path)
         config_manager.set_wake_word("test")
         
-        mock_print.assert_called()
+        # Should log the error when save fails
+        mock_logger.error.assert_called()
 
 
 if __name__ == '__main__':
