@@ -54,8 +54,11 @@ class OpenAIProvider(BaseAIProvider):
             # Build system message with context
             system_message = self._build_system_message(context)
             
-            # Build message history for OpenAI
-            messages = self._build_message_history(message, system_message)
+            # Build simple message list (no history)
+            messages = [
+                system_message,
+                {"role": "user", "content": message}
+            ]
             
             # Make API call
             response = self.client.chat.completions.create(
@@ -73,8 +76,6 @@ class OpenAIProvider(BaseAIProvider):
             # The intent will be determined by whether the response is JSON API call format
             intent = IntentType.CHAT  # Default to chat, will be updated if API call detected
             
-            # Add to conversation history
-            self.add_to_history(message, response_text)
             
             # Calculate confidence based on response quality indicators
             finish_reason = response.choices[0].finish_reason if response.choices else None
@@ -117,10 +118,5 @@ class OpenAIProvider(BaseAIProvider):
         system_content = self._build_system_content(context)
         return {"role": "system", "content": system_content}
     
-    def _build_message_history(self, current_message: str, system_message: Dict[str, str]) -> list:
-        """Build message history for OpenAI API format."""
-        messages = [system_message]
-        messages.extend(self._build_conversation_messages(current_message))
-        return messages
     
     

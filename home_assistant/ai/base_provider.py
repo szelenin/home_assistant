@@ -46,8 +46,6 @@ class BaseAIProvider(ABC):
             config: Configuration dictionary containing API keys and settings
         """
         self.config = config
-        self.conversation_history: List[Dict[str, str]] = []
-        self.max_history_length = config.get('max_history_length', 10)
     
     @abstractmethod
     def chat(self, message: str, context: Optional[Dict[str, Any]] = None) -> AIResponse:
@@ -64,24 +62,6 @@ class BaseAIProvider(ABC):
         pass
     
     
-    def add_to_history(self, user_message: str, ai_response: str):
-        """Add message pair to conversation history."""
-        self.conversation_history.append({
-            "user": user_message,
-            "assistant": ai_response
-        })
-        
-        # Trim history if it gets too long
-        if len(self.conversation_history) > self.max_history_length:
-            self.conversation_history = self.conversation_history[-self.max_history_length:]
-    
-    def clear_history(self):
-        """Clear conversation history."""
-        self.conversation_history = []
-    
-    def get_history(self) -> List[Dict[str, str]]:
-        """Get conversation history."""
-        return self.conversation_history.copy()
     
     @abstractmethod
     def is_available(self) -> bool:
@@ -121,19 +101,6 @@ Key behaviors:
         
         return system_content
     
-    def _build_conversation_messages(self, current_message: str) -> List[Dict[str, str]]:
-        """Build conversation history messages (without system message)."""
-        messages = []
-        
-        # Add conversation history (last 5 exchanges to manage token usage)
-        for entry in self.conversation_history[-5:]:
-            messages.append({"role": "user", "content": entry["user"]})
-            messages.append({"role": "assistant", "content": entry["assistant"]})
-        
-        # Add current message
-        messages.append({"role": "user", "content": current_message})
-        
-        return messages
     
     def _extract_entities(self, user_message: str, ai_response: str) -> Dict[str, Any]:
         """Extract entities from the conversation."""

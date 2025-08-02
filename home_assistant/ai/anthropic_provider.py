@@ -54,8 +54,8 @@ class AnthropicProvider(BaseAIProvider):
             # Build system prompt with context
             system_prompt = self._build_system_prompt(context)
             
-            # Build message history for Claude
-            messages = self._build_message_history(message)
+            # Build single message (no history)
+            messages = [{"role": "user", "content": message}]
             
             # Make API call
             response = self.client.messages.create(
@@ -72,8 +72,6 @@ class AnthropicProvider(BaseAIProvider):
             # Classify intent
             intent = self.classify_intent(message)
             
-            # Add to conversation history
-            self.add_to_history(message, response_text)
             
             # Calculate confidence (simple heuristic based on response length and coherence)
             confidence = min(0.95, 0.7 + (len(response_text) / 1000) * 0.2)
@@ -157,19 +155,6 @@ Key behaviors:
         
         return system_prompt
     
-    def _build_message_history(self, current_message: str) -> list:
-        """Build message history for Claude API format."""
-        messages = []
-        
-        # Add conversation history
-        for entry in self.conversation_history[-5:]:  # Last 5 exchanges
-            messages.append({"role": "user", "content": entry["user"]})
-            messages.append({"role": "assistant", "content": entry["assistant"]})
-        
-        # Add current message
-        messages.append({"role": "user", "content": current_message})
-        
-        return messages
     
     def _extract_entities(self, user_message: str, ai_response: str) -> Dict[str, Any]:
         """Extract entities from the conversation."""
