@@ -5,8 +5,7 @@ from .decorators import api_method
 class HomeAPIs:
     @api_method(
         name="Weather Information",
-        description="Get current weather conditions and forecast for any location",
-        trigger_words=["weather", "temperature", "forecast", "rain", "sunny", "cloudy", "today"]
+        description="Get current weather conditions and forecast for any location. Use this when users ask about weather, temperature, rain, forecasts, or outdoor conditions."
     )
     def get_weather(
         self, 

@@ -46,8 +46,8 @@ class TestWeatherAPIScenario(unittest.TestCase):
         # Check API definition
         weather_api = apis['get_weather']
         self.assertEqual(weather_api.name, "Weather Information")
-        self.assertIn("weather", weather_api.trigger_words)
-        self.assertIn("today", weather_api.trigger_words)
+        self.assertIn("weather", weather_api.description.lower())
+        self.assertIn("conditions", weather_api.description.lower())
         
         # Check parameters
         params = weather_api.parameters

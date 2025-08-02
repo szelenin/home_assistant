@@ -217,7 +217,6 @@ Method: {api_name}
 Description: {api_def.description}
 Parameters:
 {chr(10).join(params_str)}
-Trigger words: {', '.join(api_def.trigger_words)}
 """
             api_descriptions.append(api_desc)
 

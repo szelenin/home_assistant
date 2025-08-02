@@ -12,7 +12,6 @@ class APIDefinition:
     description: str  # Description of what the API does for AI context
     method: Callable  # The actual Python method to execute
     parameters: Dict[str, Dict[str, Any]]  # Parameter metadata: {param_name: {type, required, default, description}}
-    trigger_words: List[str]  # Keywords that might indicate this API should be used
 
 
 class APIRegistry:
@@ -32,14 +31,13 @@ class APIRegistry:
         cls._apis.clear()
 
 
-def api_method(name: str, description: str, trigger_words: List[str]):
+def api_method(name: str, description: str):
     """
     Decorator to register a method as an API endpoint.
     
     Args:
         name: Human-readable API name
         description: What this API does
-        trigger_words: Keywords that might indicate this API should be used
     """
     def decorator(func: Callable):
         # Introspect the function signature
@@ -64,8 +62,7 @@ def api_method(name: str, description: str, trigger_words: List[str]):
             name=name,
             description=description,
             method=func,
-            parameters=parameters,
-            trigger_words=trigger_words
+            parameters=parameters
         )
 
         APIRegistry.register(api_def)
