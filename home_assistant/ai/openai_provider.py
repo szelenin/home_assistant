@@ -98,6 +98,37 @@ class OpenAIProvider(BaseAIProvider):
                 confidence=0.1
             )
     
+    def simple_chat(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
+        """Send a simple message to ChatGPT without function calling (for formatting responses)."""
+        if not self.is_available():
+            raise Exception("OpenAI provider is not available")
+        
+        try:
+            # Build system message
+            system_content = self._build_system_content(context)
+            
+            # Build messages
+            messages = [
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": message}
+            ]
+            
+            # Make simple API call without functions
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature
+            )
+            
+            # Extract and return text
+            response_text = response.choices[0].message.content if response.choices else ""
+            return response_text
+            
+        except Exception as e:
+            self.logger.error(f"Error in OpenAI simple chat: {e}")
+            return f"I'm having trouble processing your request right now. Error: {str(e)}"
+    
     def _process_response(self, response, original_message: str) -> AIResponse:
         """Process OpenAI response and extract function calls or text."""
         tool_calls = []

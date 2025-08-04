@@ -95,6 +95,35 @@ class AnthropicProvider(BaseAIProvider):
                 confidence=0.1
             )
     
+    def simple_chat(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
+        """Send a simple message to Claude without function calling (for formatting responses)."""
+        if not self.is_available():
+            raise Exception("Anthropic provider is not available")
+        
+        try:
+            # Build system prompt
+            system_prompt = self._build_system_content(context)
+            
+            # Build messages
+            messages = [{"role": "user", "content": message}]
+            
+            # Make simple API call without tools
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                system=system_prompt,
+                messages=messages
+            )
+            
+            # Extract and return text
+            response_text = response.content[0].text if response.content else ""
+            return response_text
+            
+        except Exception as e:
+            self.logger.error(f"Error in Claude simple chat: {e}")
+            return f"I'm having trouble processing your request right now. Error: {str(e)}"
+    
     def _process_response(self, response, original_message: str) -> AIResponse:
         """Process Claude response and extract function calls or text."""
         tool_calls = []

@@ -221,60 +221,129 @@ class AIOrchestrator:
                     'result': {'success': False, 'error': str(e)}
                 })
         
-        # Format the final response
-        formatted_text = self._format_function_results(function_results, original_message)
+        # Make second AI call to format the function results naturally
+        formatted_text = self._format_function_results_with_ai(
+            function_results, original_message, context
+        )
         
-        # Update response with formatted text and results
+        # Update response with AI-formatted text and results
         response.text = formatted_text
         response.entities['function_results'] = function_results
         
         return response
     
-    def _format_function_results(
+    def _format_function_results_with_ai(
         self, 
         function_results, 
-        original_message: str
+        original_message: str,
+        context: Dict[str, Any]
     ) -> str:
-        """Format function results into natural language response."""
+        """Make a second AI call to format function results into natural language response."""
         
         if not function_results:
             return "I couldn't execute any functions to help with your request."
         
-        # Handle single result case
-        if len(function_results) == 1:
-            result_data = function_results[0]['result']
-            
+        # Handle errors first - don't make AI call for errors
+        for func_result in function_results:
+            result_data = func_result['result']
             if not result_data.get('success'):
                 return f"I encountered an error: {result_data.get('error', 'Unknown error')}"
-            
-            method_name = result_data.get('method', '')
-            result = result_data.get('result', {})
-            
-            # Format weather results
-            if method_name == 'get_weather':
-                location = result.get('location', 'your location')
-                temperature = result.get('temperature', 'unknown')
-                description = result.get('description', 'unknown conditions')
-                units = result.get('units', 'metric')
-                
-                unit_symbol = '°C' if units == 'metric' else '°F' if units == 'imperial' else 'K'
-                
-                return f"The weather in {location} is currently {description} with a temperature of {temperature}{unit_symbol}."
-            
-            # Generic formatting for other functions
-            return f"Here's the result: {result}"
         
-        # Handle multiple results
-        formatted_parts = []
+        # Build context message with function results for AI formatting
+        function_results_text = self._build_function_results_context(function_results)
+        
+        # Create a message for AI to format the results
+        format_message = f"""I asked: "{original_message}"
+
+I called the following functions and got these results:
+{function_results_text}
+
+Please provide a natural, helpful response to my original question using this information."""
+        
+        # Make second AI call WITHOUT function calling (just for formatting)
+        try:
+            if self.current_provider:
+                # Create a simple context for formatting (no functions needed)
+                format_context = context.copy()
+                format_context['system_prompt'] = self._build_system_content_for_formatting(format_context)
+                
+                # Use the clean abstract method instead of ugly if-branching
+                response_text = self.current_provider.simple_chat(format_message, format_context)
+                return response_text
+            
+            # Fallback to basic formatting if no provider available
+            return self._basic_format_function_results(function_results)
+            
+        except Exception as e:
+            self.logger.warning(f"AI formatting failed, using basic formatting: {e}")
+            return self._basic_format_function_results(function_results)
+    
+    def _build_function_results_context(self, function_results) -> str:
+        """Build a readable context string from function results."""
+        context_parts = []
+        
         for func_result in function_results:
             result_data = func_result['result']
             if result_data.get('success'):
                 method_name = result_data.get('method', 'function')
-                formatted_parts.append(f"{method_name}: {result_data.get('result', {})}")
+                result = result_data.get('result', {})
+                
+                # Format the result data nicely
+                if isinstance(result, dict):
+                    result_str = ', '.join([f"{k}: {v}" for k, v in result.items()])
+                else:
+                    result_str = str(result)
+                
+                context_parts.append(f"- {method_name}() returned: {result_str}")
             else:
-                formatted_parts.append(f"Error: {result_data.get('error', 'Unknown error')}")
+                error = result_data.get('error', 'Unknown error')
+                context_parts.append(f"- Function call failed: {error}")
         
-        return "Here are the results:\n" + "\n".join(formatted_parts)
+        return '\n'.join(context_parts)
+    
+    def _build_system_content_for_formatting(self, context: Dict[str, Any]) -> str:
+        """Build system prompt specifically for result formatting (no functions)."""
+        wake_word = context.get('wake_word', 'Assistant')
+        
+        return f"""You are {wake_word}, a helpful home assistant.
+
+I will provide you with the results from function calls I made to answer a user's question. 
+Please format these results into a natural, conversational response that directly answers the user's original question.
+
+Key guidelines:
+- Be conversational and helpful
+- Use the function results to provide accurate information
+- Don't mention the technical details of function calls
+- Answer as if you personally retrieved the information"""
+    
+    def _basic_format_function_results(self, function_results) -> str:
+        """Basic fallback formatting when AI formatting fails."""
+        if len(function_results) == 1:
+            result_data = function_results[0]['result']
+            if result_data.get('success'):
+                method_name = result_data.get('method', '')
+                result = result_data.get('result', {})
+                
+                # Simple weather formatting
+                if method_name == 'get_weather' and isinstance(result, dict):
+                    location = result.get('location', 'your location')
+                    temperature = result.get('temperature', 'unknown')
+                    description = result.get('description', 'unknown conditions')
+                    units = result.get('units', 'metric')
+                    
+                    unit_symbol = '°C' if units == 'metric' else '°F' if units == 'imperial' else 'K'
+                    return f"The weather in {location} is currently {description} with a temperature of {temperature}{unit_symbol}."
+                
+                return f"Here's the result: {result}"
+        
+        # Multiple results
+        results_text = []
+        for func_result in function_results:
+            result_data = func_result['result']
+            if result_data.get('success'):
+                results_text.append(str(result_data.get('result', {})))
+        
+        return "Here are the results: " + ", ".join(results_text)
     
     def get_available_providers(self) -> Dict[str, bool]:
         """Get status of all providers."""

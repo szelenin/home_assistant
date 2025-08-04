@@ -74,6 +74,20 @@ class BaseAIProvider(ABC):
         """
         pass
     
+    @abstractmethod
+    def simple_chat(self, message: str, context: Optional[Dict[str, Any]] = None) -> str:
+        """
+        Send a simple message to the AI without function calling (for formatting responses).
+        
+        Args:
+            message: User's message
+            context: Optional context information (wake word, user preferences, etc.)
+            
+        Returns:
+            Simple text response from AI
+        """
+        pass
+    
     
     
     @abstractmethod
