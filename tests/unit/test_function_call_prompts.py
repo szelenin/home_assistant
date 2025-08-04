@@ -19,12 +19,8 @@ class TestFunctionCallPrompts(unittest.TestCase):
     
     def setUp(self):
         """Set up test fixtures - use real HomeAPIs to get actual API definitions."""
-        # Clear registry to ensure clean state
-        APIRegistry.clear()
-        
-        # Import HomeAPIs to trigger decorator registration
+        # Import HomeAPIs to trigger decorator registration (happens at import time)
         from home_assistant.apis.home_apis import HomeAPIs
-        HomeAPIs()  # This will register the get_weather API
         
         # Get the registered API definitions
         self.api_definitions = APIRegistry.get_all_apis()
@@ -112,13 +108,13 @@ class TestFunctionCallPrompts(unittest.TestCase):
         
         # Check that descriptions are meaningful (not just default)
         location_desc = properties['location']['description']
-        self.assertIn('location', location_desc.lower())
+        self.assertIn('city', location_desc.lower())  # "City name or address"
         
         units_desc = properties['units']['description']
-        self.assertIn('units', units_desc.lower())
+        self.assertIn('temperature', units_desc.lower())  # "Temperature units"
         
         days_desc = properties['days']['description']
-        self.assertIn('days', days_desc.lower())
+        self.assertIn('forecast', days_desc.lower())  # "Number of forecast days"
     
     def test_both_formats_have_same_content(self):
         """Test that both Anthropic and OpenAI formats contain the same essential information."""
