@@ -10,25 +10,37 @@ from dataclasses import dataclass
 from enum import Enum
 from datetime import datetime
 import re
+import json
 
 
 class IntentType(Enum):
-    """Simplified intent types for the decorator-based API system."""
-    API_CALL = "api_call"    # AI detected and wants to execute an API call
-    CHAT = "chat"            # Regular conversational response
-    UNKNOWN = "unknown"      # Fallback for errors
+    """Intent types for function calling system."""
+    FUNCTION_CALL = "function_call"  # AI made function calls
+    CHAT = "chat"                   # Regular conversational response
+    UNKNOWN = "unknown"             # Fallback for errors
+
+
+@dataclass
+class ToolCall:
+    """Represents a function/tool call from the AI."""
+    id: str
+    name: str
+    arguments: Dict[str, Any]
 
 
 @dataclass
 class AIResponse:
-    """Response from AI provider with intent classification."""
+    """Response from AI provider with function calling support."""
     text: str
     intent: IntentType
     confidence: float
+    tool_calls: List[ToolCall] = None
     entities: Dict[str, Any] = None
     raw_response: Dict[str, Any] = None
     
     def __post_init__(self):
+        if self.tool_calls is None:
+            self.tool_calls = []
         if self.entities is None:
             self.entities = {}
         if self.raw_response is None:
@@ -48,16 +60,17 @@ class BaseAIProvider(ABC):
         self.config = config
     
     @abstractmethod
-    def chat(self, message: str, context: Optional[Dict[str, Any]] = None) -> AIResponse:
+    def chat_with_functions(self, message: str, api_definitions: Dict[str, Any], context: Optional[Dict[str, Any]] = None) -> AIResponse:
         """
-        Send a message to the AI and get a response.
+        Send a message to the AI with function calling capability.
         
         Args:
             message: User's message
+            api_definitions: Dictionary of API definitions from APIRegistry
             context: Optional context information (wake word, user preferences, etc.)
             
         Returns:
-            AIResponse object with text, intent, and metadata
+            AIResponse object with text, function calls, and metadata
         """
         pass
     
@@ -86,18 +99,12 @@ class BaseAIProvider(ABC):
 
 Key behaviors:
 - Be concise and helpful in your responses
-- For weather questions, acknowledge you don't have real-time weather data but provide general guidance
-- For personal questions about your name, respond with your wake word: "{wake_word}"
-- For device control requests, acknowledge the command but explain you're not yet connected to physical devices
+- Use the available functions to fulfill user requests when appropriate
 - Maintain a friendly, conversational tone
-- Keep responses brief unless more detail is specifically requested
-- Be honest about your limitations"""
+- Keep responses brief unless more detail is specifically requested"""
         
         if context and 'user_preferences' in context:
             system_content += f"\n\nUser preferences: {context['user_preferences']}"
-        
-        if context and 'system_prompt' in context:
-            system_content += f"\n\n{context['system_prompt']}"
         
         return system_content
     
@@ -120,11 +127,6 @@ Key behaviors:
         time_refs = [word for word in time_words if word in user_message.lower()]
         if time_refs:
             entities['time_references'] = time_refs
-        
-        # Extract numbers (for device control, temperatures, etc.)
-        numbers = re.findall(r'\b\d+\b', user_message)
-        if numbers:
-            entities['numbers'] = [int(num) for num in numbers]
         
         return entities
     

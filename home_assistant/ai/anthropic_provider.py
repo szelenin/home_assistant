@@ -1,12 +1,11 @@
 """
 Anthropic Claude AI Provider
 
-Implements the BaseAIProvider interface for Anthropic's Claude models.
+Implements the BaseAIProvider interface for Anthropic's Claude models with native function calling.
 """
 
-import re
-from typing import Dict, Any, Optional
-from datetime import datetime
+import json
+from typing import Dict, Any, Optional, List
 
 try:
     import anthropic
@@ -14,16 +13,25 @@ try:
 except ImportError:
     ANTHROPIC_AVAILABLE = False
 
-from .base_provider import BaseAIProvider, AIResponse, IntentType
-from ..utils.logger import setup_logging
+try:
+    from .base_provider import BaseAIProvider, AIResponse, IntentType, ToolCall
+    from .function_prompts import AnthropicFunctionCallPrompt
+    from ..utils.logger import setup_logging
+except ImportError:
+    from base_provider import BaseAIProvider, AIResponse, IntentType, ToolCall
+    from function_prompts import AnthropicFunctionCallPrompt
 
 
 class AnthropicProvider(BaseAIProvider):
-    """AI Provider for Anthropic Claude models."""
+    """AI Provider for Anthropic Claude models with native function calling."""
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
-        self.logger = setup_logging("home_assistant.ai.anthropic")
+        try:
+            self.logger = setup_logging("home_assistant.ai.anthropic")
+        except:
+            import logging
+            self.logger = logging.getLogger("anthropic_provider")
         
         # Provider-specific configuration
         self.api_key = config.get('anthropic_api_key')
@@ -45,90 +53,91 @@ class AnthropicProvider(BaseAIProvider):
             if not self.api_key:
                 self.logger.warning("Anthropic API key not provided in configuration")
     
-    def chat(self, message: str, context: Optional[Dict[str, Any]] = None) -> AIResponse:
-        """Send message to Claude and get response with intent classification."""
+    def chat_with_functions(
+        self, 
+        message: str, 
+        api_definitions: Dict[str, Any], 
+        context: Optional[Dict[str, Any]] = None
+    ) -> AIResponse:
+        """Send message to Claude with function calling capability."""
         if not self.is_available():
             raise Exception("Anthropic provider is not available")
         
         try:
-            # Build system prompt with context
-            system_prompt = self._build_system_prompt(context)
+            # Create function call prompt
+            function_prompt = AnthropicFunctionCallPrompt(api_definitions)
+            tools = function_prompt.get_function_definitions()
             
-            # Build single message (no history)
+            # Build system prompt
+            system_prompt = self._build_system_content(context)
+            
+            # Build messages
             messages = [{"role": "user", "content": message}]
             
-            # Make API call
+            # Make API call with tools (don't specify tool_choice for Anthropic)
             response = self.client.messages.create(
                 model=self.model,
                 max_tokens=self.max_tokens,
                 temperature=self.temperature,
                 system=system_prompt,
-                messages=messages
+                messages=messages,
+                tools=tools
             )
             
-            # Extract response text
-            response_text = response.content[0].text if response.content else ""
-            
-            # Classify intent
-            intent = self.classify_intent(message)
-            
-            
-            # Calculate confidence (simple heuristic based on response length and coherence)
-            confidence = min(0.95, 0.7 + (len(response_text) / 1000) * 0.2)
-            
-            self.logger.info(f"Claude response generated. Intent: {intent.value}, Confidence: {confidence:.2f}")
-            
-            return AIResponse(
-                text=response_text,
-                intent=intent,
-                confidence=confidence,
-                entities=self._extract_entities(message, response_text),
-                raw_response={
-                    'model': response.model,
-                    'usage': response.usage.dict() if hasattr(response, 'usage') else {},
-                    'stop_reason': response.stop_reason
-                }
-            )
+            # Process response
+            return self._process_response(response, message)
             
         except Exception as e:
-            self.logger.error(f"Error in Claude chat: {e}")
-            # Return fallback response
+            self.logger.error(f"Error in Claude function calling: {e}")
             return AIResponse(
                 text=f"I'm having trouble processing your request right now. Error: {str(e)}",
                 intent=IntentType.UNKNOWN,
                 confidence=0.1
             )
     
-    def classify_intent(self, message: str) -> IntentType:
-        """Classify message intent using keyword matching and patterns."""
-        message_lower = message.lower().strip()
+    def _process_response(self, response, original_message: str) -> AIResponse:
+        """Process Claude response and extract function calls or text."""
+        tool_calls = []
+        response_text = ""
+        intent = IntentType.CHAT
         
-        # Weather patterns
-        weather_keywords = ['weather', 'temperature', 'rain', 'sunny', 'cloudy', 'forecast']
-        if any(keyword in message_lower for keyword in weather_keywords):
-            return IntentType.WEATHER
+        # Process response content
+        for content_block in response.content:
+            if content_block.type == "text":
+                response_text += content_block.text
+            elif content_block.type == "tool_use":
+                # Claude made a function call
+                tool_call = ToolCall(
+                    id=content_block.id,
+                    name=content_block.name,
+                    arguments=content_block.input
+                )
+                tool_calls.append(tool_call)
+                intent = IntentType.FUNCTION_CALL
         
-        # Personal info patterns
-        if any(phrase in message_lower for phrase in ['what is your name', 'who are you', 'your name']):
-            return IntentType.PERSONAL_INFO
+        # Calculate confidence
+        confidence = self._calculate_response_confidence(
+            response_text, 
+            response.stop_reason
+        )
         
-        # Device control patterns
-        device_keywords = ['turn on', 'turn off', 'switch', 'light', 'device', 'control']
-        if any(keyword in message_lower for keyword in device_keywords):
-            return IntentType.DEVICE_CONTROL
+        self.logger.info(
+            f"Claude response: {len(tool_calls)} tool calls, "
+            f"intent: {intent.value}, confidence: {confidence:.2f}"
+        )
         
-        # Time/date patterns
-        time_keywords = ['time', 'date', 'today', 'tomorrow', 'yesterday', 'when', 'schedule']
-        if any(keyword in message_lower for keyword in time_keywords):
-            return IntentType.TIME_DATE
-        
-        # Question patterns
-        question_words = ['what', 'how', 'why', 'where', 'when', 'who']
-        if any(message_lower.startswith(word) for word in question_words) or message_lower.endswith('?'):
-            return IntentType.QUESTION
-        
-        # Default to general chat
-        return IntentType.GENERAL_CHAT
+        return AIResponse(
+            text=response_text,
+            intent=intent,
+            confidence=confidence,
+            tool_calls=tool_calls,
+            entities=self._extract_entities(original_message, response_text),
+            raw_response={
+                'model': response.model,
+                'usage': response.usage.dict() if hasattr(response, 'usage') else {},
+                'stop_reason': response.stop_reason
+            }
+        )
     
     def is_available(self) -> bool:
         """Check if Anthropic provider is available."""
@@ -137,39 +146,3 @@ class AnthropicProvider(BaseAIProvider):
             self.client is not None and 
             self.api_key is not None
         )
-    
-    def _build_system_prompt(self, context: Optional[Dict[str, Any]] = None) -> str:
-        """Build system prompt with context information."""
-        wake_word = context.get('wake_word', 'Assistant') if context else 'Assistant'
-        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        system_prompt = f"""You are {wake_word}, a helpful home assistant. Current time: {current_time}
-
-Key behaviors:
-- Be concise and helpful
-- Maintain a friendly, conversational tone
-- Keep responses brief unless more detail is specifically requested"""
-        
-        if context and 'user_preferences' in context:
-            system_prompt += f"\n\nUser preferences: {context['user_preferences']}"
-        
-        return system_prompt
-    
-    
-    def _extract_entities(self, user_message: str, ai_response: str) -> Dict[str, Any]:
-        """Extract entities from the conversation."""
-        entities = {}
-        
-        # Extract locations (simple pattern matching)
-        location_pattern = r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\b'
-        locations = re.findall(location_pattern, user_message)
-        if locations:
-            entities['locations'] = locations
-        
-        # Extract time references
-        time_words = ['today', 'tomorrow', 'yesterday', 'tonight', 'morning', 'afternoon', 'evening']
-        time_refs = [word for word in time_words if word in user_message.lower()]
-        if time_refs:
-            entities['time_references'] = time_refs
-        
-        return entities

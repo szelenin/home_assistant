@@ -1,16 +1,15 @@
 """
 AI Orchestrator
 
-Central orchestrator for AI providers that handles intent recognition,
-provider selection, and natural language to device API translation.
+Central orchestrator for AI providers with native function calling support.
+Simplified architecture that uses provider-native function calling instead of custom JSON parsing.
 """
 
 from typing import Dict, Any, Optional, Type
-from datetime import datetime
 import json
 
-from .base_provider import BaseAIProvider, AIResponse, IntentType
-from .anthropic_provider import AnthropicProvider
+from .base_provider import BaseAIProvider, AIResponse, IntentType, ToolCall
+from .anthropic_provider import AnthropicProvider  
 from .openai_provider import OpenAIProvider
 from ..utils.config import ConfigManager
 from ..utils.logger import setup_logging
@@ -18,7 +17,7 @@ from ..utils.logger import setup_logging
 
 class AIOrchestrator:
     """
-    Central orchestrator for managing AI providers and handling requests.
+    Central orchestrator for managing AI providers with function calling.
     """
     
     def __init__(self, config_manager: ConfigManager):
@@ -101,14 +100,14 @@ class AIOrchestrator:
     
     def chat(self, message: str, context: Optional[Dict[str, Any]] = None) -> AIResponse:
         """
-        Process a chat message through the AI provider with API call detection.
+        Process a chat message through the AI provider with function calling.
         
         Args:
             message: User's message
             context: Optional context (wake word, user preferences, etc.)
             
         Returns:
-            AIResponse with text, intent, and metadata
+            AIResponse with text, function calls, and metadata
         """
         if not context:
             context = {}
@@ -118,38 +117,164 @@ class AIOrchestrator:
         if wake_word:
             context['wake_word'] = wake_word
         
-        # Initialize API components if available
+        # Initialize API components
         self._initialize_api_components()
         
-        # Add API context if available
-        if self.api_registry:
-            api_context = self._build_api_context()
-            context['available_apis'] = api_context
-        
-        # Try to get AI response with API detection
         try:
-            response = self._get_ai_response_with_api_detection(message, context)
+            # Get API definitions for function calling
+            api_definitions = {}
+            if self.api_registry:
+                api_definitions = self.api_registry.get_all_apis()
             
-            # If API call detected, execute it
-            if self._is_api_call_response(response) and self.api_executor and self.home_apis:
-                api_call_data = self._parse_api_call_response(response)
-                if api_call_data:
-                    api_result = self._execute_api_call(api_call_data)
-                    response.text = self._format_api_result(message, api_result, context)
-                    response.entities['api_call'] = api_call_data
-                    response.entities['api_result'] = api_result
+            # Get AI response with function calling
+            response = self._get_ai_response_with_functions(message, api_definitions, context)
+            
+            # Execute any function calls
+            if response.tool_calls and self.api_executor and self.home_apis:
+                response = self._execute_function_calls(response, message, context)
             
             return response
             
         except Exception as e:
-            self.logger.error(f"Error in enhanced chat: {e}")
+            self.logger.error(f"Error in chat processing: {e}")
             return AIResponse(
                 text="I'm having trouble processing your request right now.",
                 intent=IntentType.UNKNOWN,
                 confidence=0.1
             )
     
+    def _get_ai_response_with_functions(
+        self, 
+        message: str, 
+        api_definitions: Dict[str, Any], 
+        context: Dict[str, Any]
+    ) -> AIResponse:
+        """Get AI response with function calling capability."""
+        
+        # Try primary provider first
+        if self.current_provider:
+            try:
+                response = self.current_provider.chat_with_functions(
+                    message, api_definitions, context
+                )
+                self.logger.debug(
+                    f"Response from {self.current_provider.get_provider_name()}: "
+                    f"{response.intent.value}, {len(response.tool_calls)} function calls"
+                )
+                return response
+            except Exception as e:
+                self.logger.warning(f"Primary provider failed: {e}")
+        
+        # Fallback to secondary provider
+        if self.fallback_provider:
+            try:
+                response = self.fallback_provider.chat_with_functions(
+                    message, api_definitions, context
+                )
+                self.logger.info(
+                    f"Using fallback provider: {self.fallback_provider.get_provider_name()}"
+                )
+                return response
+            except Exception as e:
+                self.logger.error(f"Fallback provider also failed: {e}")
+        
+        # Return error response if all providers fail
+        return AIResponse(
+            text="I'm having trouble connecting to my AI services right now.",
+            intent=IntentType.UNKNOWN,
+            confidence=0.1
+        )
     
+    def _execute_function_calls(
+        self, 
+        response: AIResponse, 
+        original_message: str,
+        context: Dict[str, Any]
+    ) -> AIResponse:
+        """Execute function calls and format the final response."""
+        
+        # Execute all function calls
+        function_results = []
+        for tool_call in response.tool_calls:
+            try:
+                # Execute the function call
+                from ..apis.executor import APICall
+                
+                api_call = APICall(
+                    method_name=tool_call.name,
+                    parameters=tool_call.arguments,
+                    reasoning="Function call from AI"
+                )
+                
+                result = self.api_executor.execute_api_call(api_call, self.home_apis)
+                function_results.append({
+                    'tool_call_id': tool_call.id,
+                    'result': result
+                })
+                
+                self.logger.info(f"Executed function {tool_call.name}: {result.get('success', False)}")
+                
+            except Exception as e:
+                self.logger.error(f"Error executing function {tool_call.name}: {e}")
+                function_results.append({
+                    'tool_call_id': tool_call.id,
+                    'result': {'success': False, 'error': str(e)}
+                })
+        
+        # Format the final response
+        formatted_text = self._format_function_results(function_results, original_message)
+        
+        # Update response with formatted text and results
+        response.text = formatted_text
+        response.entities['function_results'] = function_results
+        
+        return response
+    
+    def _format_function_results(
+        self, 
+        function_results, 
+        original_message: str
+    ) -> str:
+        """Format function results into natural language response."""
+        
+        if not function_results:
+            return "I couldn't execute any functions to help with your request."
+        
+        # Handle single result case
+        if len(function_results) == 1:
+            result_data = function_results[0]['result']
+            
+            if not result_data.get('success'):
+                return f"I encountered an error: {result_data.get('error', 'Unknown error')}"
+            
+            method_name = result_data.get('method', '')
+            result = result_data.get('result', {})
+            
+            # Format weather results
+            if method_name == 'get_weather':
+                location = result.get('location', 'your location')
+                temperature = result.get('temperature', 'unknown')
+                description = result.get('description', 'unknown conditions')
+                units = result.get('units', 'metric')
+                
+                unit_symbol = '°C' if units == 'metric' else '°F' if units == 'imperial' else 'K'
+                
+                return f"The weather in {location} is currently {description} with a temperature of {temperature}{unit_symbol}."
+            
+            # Generic formatting for other functions
+            return f"Here's the result: {result}"
+        
+        # Handle multiple results
+        formatted_parts = []
+        for func_result in function_results:
+            result_data = func_result['result']
+            if result_data.get('success'):
+                method_name = result_data.get('method', 'function')
+                formatted_parts.append(f"{method_name}: {result_data.get('result', {})}")
+            else:
+                formatted_parts.append(f"Error: {result_data.get('error', 'Unknown error')}")
+        
+        return "Here are the results:\n" + "\n".join(formatted_parts)
     
     def get_available_providers(self) -> Dict[str, bool]:
         """Get status of all providers."""
@@ -196,135 +321,3 @@ class AIOrchestrator:
         except Exception as e:
             self.logger.error(f"Error switching to provider {provider_name}: {e}")
             return False
-    
-    def _build_api_context(self) -> str:
-        """Build API context string for AI prompt."""
-        if not self.api_registry:
-            return ""
-        
-        apis = self.api_registry.get_all_apis()
-        api_descriptions = []
-
-        for api_name, api_def in apis.items():
-            params_str = []
-            for param_name, param_info in api_def.parameters.items():
-                required = " (required)" if param_info['required'] else f" (default: {param_info['default']})"
-                params_str.append(f"  - {param_name}: {param_info['description']}{required}")
-
-            api_desc = f"""
-API: {api_def.name}
-Method: {api_name}
-Description: {api_def.description}
-Parameters:
-{chr(10).join(params_str)}
-"""
-            api_descriptions.append(api_desc)
-
-        return "\n".join(api_descriptions)
-    
-    def _get_ai_response_with_api_detection(self, message: str, context: Dict[str, Any]) -> AIResponse:
-        """Get AI response with enhanced API detection prompt."""
-        # Enhanced system prompt for API detection
-        if 'available_apis' in context:
-            enhanced_context = context.copy()
-            enhanced_context['system_prompt'] = f"""
-You are a helpful home assistant. You have access to the following APIs:
-
-{context['available_apis']}
-
-IMPORTANT: If the user's message can be fulfilled by calling one of these APIs, respond with a JSON object:
-{{
-  "intent": "api_call",
-  "api_method": "method_name",
-  "parameters": {{"param1": "value1", "param2": "value2"}},
-  "reasoning": "why you chose this API"
-}}
-
-Otherwise, respond normally as a helpful assistant.
-"""
-        else:
-            enhanced_context = context
-        
-        # Try primary provider first
-        if self.current_provider:
-            try:
-                response = self.current_provider.chat(message, enhanced_context)
-                self.logger.debug(f"Response from {self.current_provider.get_provider_name()}: {response.intent.value}")
-                return response
-            except Exception as e:
-                self.logger.warning(f"Primary provider failed: {e}")
-        
-        # Fallback to secondary provider
-        if self.fallback_provider:
-            try:
-                response = self.fallback_provider.chat(message, enhanced_context)
-                self.logger.info(f"Using fallback provider: {self.fallback_provider.get_provider_name()}")
-                return response
-            except Exception as e:
-                self.logger.error(f"Fallback provider also failed: {e}")
-        
-        # Return error response if all providers fail
-        return AIResponse(
-            text="I'm having trouble connecting to my AI services right now.",
-            intent=IntentType.UNKNOWN,
-            confidence=0.1
-        )
-    
-    def _is_api_call_response(self, response: AIResponse) -> bool:
-        """Check if response contains API call data."""
-        try:
-            # Try to parse as JSON to see if it's an API call
-            if response.text.strip().startswith('{') and response.text.strip().endswith('}'):
-                data = json.loads(response.text)
-                return data.get('intent') == 'api_call' and 'api_method' in data
-        except json.JSONDecodeError:
-            pass
-        return False
-    
-    def _parse_api_call_response(self, response: AIResponse) -> Optional[Dict[str, Any]]:
-        """Parse API call data from response."""
-        try:
-            data = json.loads(response.text)
-            if data.get('intent') == 'api_call':
-                return {
-                    'method_name': data.get('api_method'),
-                    'parameters': data.get('parameters', {}),
-                    'reasoning': data.get('reasoning', '')
-                }
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Failed to parse API call response: {e}")
-        return None
-    
-    def _execute_api_call(self, api_call_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute API call using the executor."""
-        from ..apis.executor import APICall
-        
-        api_call = APICall(
-            method_name=api_call_data['method_name'],
-            parameters=api_call_data['parameters'],
-            reasoning=api_call_data.get('reasoning', '')
-        )
-        
-        return self.api_executor.execute_api_call(api_call, self.home_apis)
-    
-    def _format_api_result(self, original_message: str, api_result: Dict[str, Any], context: Dict[str, Any]) -> str:
-        """Format API result into natural language response."""
-        if not api_result.get('success'):
-            return f"I encountered an error: {api_result.get('error', 'Unknown error')}"
-        
-        result_data = api_result.get('result', {})
-        method_name = api_result.get('method', '')
-        
-        # Format weather results
-        if method_name == 'get_weather':
-            location = result_data.get('location', 'your location')
-            temperature = result_data.get('temperature', 'unknown')
-            description = result_data.get('description', 'unknown conditions')
-            units = result_data.get('units', 'metric')
-            
-            unit_symbol = '°C' if units == 'metric' else '°F' if units == 'imperial' else 'K'
-            
-            return f"The weather in {location} is currently {description} with a temperature of {temperature}{unit_symbol}."
-        
-        # Generic formatting for other APIs
-        return f"Here's the result: {result_data}"

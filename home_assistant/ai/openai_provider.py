@@ -1,12 +1,11 @@
 """
 OpenAI ChatGPT AI Provider
 
-Implements the BaseAIProvider interface for OpenAI's GPT models.
+Implements the BaseAIProvider interface for OpenAI's GPT models with native function calling.
 """
 
-import re
-from typing import Dict, Any, Optional
-from datetime import datetime
+import json
+from typing import Dict, Any, Optional, List
 
 try:
     import openai
@@ -14,16 +13,25 @@ try:
 except ImportError:
     OPENAI_AVAILABLE = False
 
-from .base_provider import BaseAIProvider, AIResponse, IntentType
-from ..utils.logger import setup_logging
+try:
+    from .base_provider import BaseAIProvider, AIResponse, IntentType, ToolCall
+    from .function_prompts import OpenAIFunctionCallPrompt
+    from ..utils.logger import setup_logging
+except ImportError:
+    from base_provider import BaseAIProvider, AIResponse, IntentType, ToolCall
+    from function_prompts import OpenAIFunctionCallPrompt
 
 
 class OpenAIProvider(BaseAIProvider):
-    """AI Provider for OpenAI GPT models."""
+    """AI Provider for OpenAI GPT models with native function calling."""
     
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
-        self.logger = setup_logging("home_assistant.ai.openai")
+        try:
+            self.logger = setup_logging("home_assistant.ai.openai")
+        except:
+            import logging
+            self.logger = logging.getLogger("openai_provider")
         
         # Provider-specific configuration
         self.api_key = config.get('openai_api_key')
@@ -45,65 +53,110 @@ class OpenAIProvider(BaseAIProvider):
             if not self.api_key:
                 self.logger.warning("OpenAI API key not provided in configuration")
     
-    def chat(self, message: str, context: Optional[Dict[str, Any]] = None) -> AIResponse:
-        """Send message to ChatGPT and get response with intent classification."""
+    def chat_with_functions(
+        self, 
+        message: str, 
+        api_definitions: Dict[str, Any], 
+        context: Optional[Dict[str, Any]] = None
+    ) -> AIResponse:
+        """Send message to ChatGPT with function calling capability."""
         if not self.is_available():
             raise Exception("OpenAI provider is not available")
         
         try:
-            # Build system message with context
-            system_message = self._build_system_message(context)
+            # Create function call prompt
+            function_prompt = OpenAIFunctionCallPrompt(api_definitions)
+            functions = function_prompt.get_function_definitions()
             
-            # Build simple message list (no history)
+            # Build system message
+            system_content = self._build_system_content(context)
+            
+            # Build messages
             messages = [
-                system_message,
+                {"role": "system", "content": system_content},
                 {"role": "user", "content": message}
             ]
             
-            # Make API call
+            # Make API call with functions
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=messages,
                 max_tokens=self.max_tokens,
-                temperature=self.temperature
+                temperature=self.temperature,
+                functions=functions,
+                function_call="auto"
             )
             
-            # Extract response text
-            response_text = response.choices[0].message.content if response.choices else ""
-            
-            # Classify intent
-            # With the new API system, all responses are either API_CALL or CHAT
-            # The intent will be determined by whether the response is JSON API call format
-            intent = IntentType.CHAT  # Default to chat, will be updated if API call detected
-            
-            
-            # Calculate confidence based on response quality indicators
-            finish_reason = response.choices[0].finish_reason if response.choices else None
-            confidence = self._calculate_response_confidence(response_text, finish_reason)
-            
-            self.logger.info(f"ChatGPT response generated. Intent: {intent.value}, Confidence: {confidence:.2f}")
-            
-            return AIResponse(
-                text=response_text,
-                intent=intent,
-                confidence=confidence,
-                entities=self._extract_entities(message, response_text),
-                raw_response={
-                    'model': response.model,
-                    'usage': response.usage.dict() if hasattr(response.usage, 'dict') else response.usage.__dict__,
-                    'finish_reason': response.choices[0].finish_reason if response.choices else None
-                }
-            )
+            # Process response
+            return self._process_response(response, message)
             
         except Exception as e:
-            self.logger.error(f"Error in ChatGPT chat: {e}")
-            # Return fallback response
+            self.logger.error(f"Error in OpenAI function calling: {e}")
             return AIResponse(
                 text=f"I'm having trouble processing your request right now. Error: {str(e)}",
-                intent=IntentType.CHAT,
+                intent=IntentType.UNKNOWN,
                 confidence=0.1
             )
     
+    def _process_response(self, response, original_message: str) -> AIResponse:
+        """Process OpenAI response and extract function calls or text."""
+        tool_calls = []
+        response_text = ""
+        intent = IntentType.CHAT
+        
+        # Process response
+        if response.choices:
+            choice = response.choices[0]
+            message = choice.message
+            
+            # Extract text content
+            if message.content:
+                response_text = message.content
+            
+            # Extract function calls
+            if message.function_call:
+                # Single function call (legacy format)
+                tool_call = ToolCall(
+                    id=f"call_{hash(message.function_call.name)}",  # Generate ID
+                    name=message.function_call.name,
+                    arguments=json.loads(message.function_call.arguments)
+                )
+                tool_calls.append(tool_call)
+                intent = IntentType.FUNCTION_CALL
+            
+            elif hasattr(message, 'tool_calls') and message.tool_calls:
+                # Multiple function calls (newer format)
+                for tool_call in message.tool_calls:
+                    if tool_call.type == "function":
+                        tc = ToolCall(
+                            id=tool_call.id,
+                            name=tool_call.function.name,
+                            arguments=json.loads(tool_call.function.arguments)
+                        )
+                        tool_calls.append(tc)
+                        intent = IntentType.FUNCTION_CALL
+        
+        # Calculate confidence
+        finish_reason = response.choices[0].finish_reason if response.choices else None
+        confidence = self._calculate_response_confidence(response_text, finish_reason)
+        
+        self.logger.info(
+            f"OpenAI response: {len(tool_calls)} function calls, "
+            f"intent: {intent.value}, confidence: {confidence:.2f}"
+        )
+        
+        return AIResponse(
+            text=response_text,
+            intent=intent,
+            confidence=confidence,
+            tool_calls=tool_calls,
+            entities=self._extract_entities(original_message, response_text),
+            raw_response={
+                'model': response.model,
+                'usage': response.usage.dict() if hasattr(response.usage, 'dict') else response.usage.__dict__,
+                'finish_reason': finish_reason
+            }
+        )
     
     def is_available(self) -> bool:
         """Check if OpenAI provider is available."""
@@ -112,11 +165,3 @@ class OpenAIProvider(BaseAIProvider):
             self.client is not None and 
             self.api_key is not None
         )
-    
-    def _build_system_message(self, context: Optional[Dict[str, Any]] = None) -> Dict[str, str]:
-        """Build system message with context information."""
-        system_content = self._build_system_content(context)
-        return {"role": "system", "content": system_content}
-    
-    
-    
