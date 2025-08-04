@@ -5,7 +5,7 @@ Central orchestrator for AI providers with native function calling support.
 Simplified architecture that uses provider-native function calling instead of custom JSON parsing.
 """
 
-from typing import Dict, Any, Optional, Type
+from typing import Dict, Any, Optional, Type, List
 import json
 
 from .base_provider import BaseAIProvider, AIResponse, IntentType, ToolCall
@@ -129,9 +129,19 @@ class AIOrchestrator:
             # Get AI response with function calling
             response = self._get_ai_response_with_functions(message, api_definitions, context)
             
-            # Execute any function calls
+            # If function calls were detected, execute them and format with second AI call
             if response.tool_calls and self.api_executor and self.home_apis:
-                response = self._execute_function_calls(response, message, context)
+                # Execute the function calls
+                function_results = self._execute_function_calls(response.tool_calls)
+                
+                # Make second AI call to format the results naturally
+                formatted_text = self._format_function_results_with_ai(
+                    function_results, message, context
+                )
+                
+                # Update response with AI-formatted text and results
+                response.text = formatted_text
+                response.entities['function_results'] = function_results
             
             return response
             
@@ -185,17 +195,11 @@ class AIOrchestrator:
             confidence=0.1
         )
     
-    def _execute_function_calls(
-        self, 
-        response: AIResponse, 
-        original_message: str,
-        context: Dict[str, Any]
-    ) -> AIResponse:
-        """Execute function calls and format the final response."""
+    def _execute_function_calls(self, tool_calls: List[ToolCall]) -> List[Dict[str, Any]]:
+        """Execute function calls and return results."""
         
-        # Execute all function calls
         function_results = []
-        for tool_call in response.tool_calls:
+        for tool_call in tool_calls:
             try:
                 # Execute the function call
                 from ..apis.executor import APICall
@@ -221,16 +225,7 @@ class AIOrchestrator:
                     'result': {'success': False, 'error': str(e)}
                 })
         
-        # Make second AI call to format the function results naturally
-        formatted_text = self._format_function_results_with_ai(
-            function_results, original_message, context
-        )
-        
-        # Update response with AI-formatted text and results
-        response.text = formatted_text
-        response.entities['function_results'] = function_results
-        
-        return response
+        return function_results
     
     def _format_function_results_with_ai(
         self, 
