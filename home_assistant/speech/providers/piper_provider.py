@@ -87,18 +87,49 @@ class PiperTTSProvider(BaseTTSProvider):
             try:
                 result = subprocess.run(['piper', '--help'], 
                                       capture_output=True, timeout=5)
-                return result.returncode == 0
+                if result.returncode == 0:
+                    # Additional check: verify if configured model exists
+                    return self._check_model_availability()
             except Exception:
                 pass
         
         # Check for Python module
         try:
             import piper
-            return True
+            return self._check_model_availability()
         except ImportError:
             pass
         
         return False
+    
+    def _check_model_availability(self) -> bool:
+        """Check if the configured model is available."""
+        try:
+            model_name = self.config.get('model', 'en_US-lessac-medium')
+            
+            # Check if model files exist in current directory
+            model_onnx = f"{model_name}.onnx"
+            model_json = f"{model_name}.onnx.json"
+            
+            if os.path.exists(model_onnx) and os.path.exists(model_json):
+                return True
+            
+            # For command line version, try a quick test
+            if self.piper_cmd == 'piper':
+                try:
+                    # Try to get model info (this will fail if model doesn't exist)
+                    result = subprocess.run([
+                        self.piper_cmd, '--model', model_name, '--help'
+                    ], capture_output=True, timeout=3)
+                    # If it doesn't immediately fail with model not found, assume available
+                    return 'Unable to find voice' not in result.stderr
+                except:
+                    pass
+            
+            # If we can't verify, assume available (will fail gracefully later)
+            return True
+        except Exception:
+            return True
     
     def speak(self, text: str) -> bool:
         """Speak the given text using Piper TTS."""
