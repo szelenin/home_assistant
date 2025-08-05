@@ -11,7 +11,7 @@ speech:
   - vosk
   - sphinx
 tts:
-  provider: pyttsx  # Options: pyttsx, espeak, piper
+  provider: piper  # Options: piper, pyttsx, espeak
   providers:
     pyttsx:
       voice_id: com.apple.voice.compact.en-US.Samantha

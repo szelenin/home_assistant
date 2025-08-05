@@ -51,7 +51,7 @@ sudo pacman -S portaudio
 
 #### TTS Engine Dependencies (Optional)
 
-Choose the TTS engines you want to use. The default `pyttsx` provider works without additional system dependencies.
+Choose the TTS engines you want to use. The default `piper` provider offers the highest quality neural speech synthesis.
 
 ##### eSpeak-NG (Direct Provider)
 For using the direct eSpeak TTS provider:
@@ -76,15 +76,10 @@ sudo dnf install espeak-ng
 sudo pacman -S espeak-ng
 ```
 
-##### Piper Neural TTS (Model Download Required)
-Piper TTS requires downloading neural voice models:
+##### Piper Neural TTS (Default - Model Download Required)
+Piper TTS is the default high-quality neural TTS engine. It requires downloading neural voice models:
 
-**1. Install Piper (handled by pip in requirements.txt):**
-```bash
-pip install piper-tts>=1.3.0
-```
-
-**2. Download Voice Models:**
+**1. Download Voice Models:**
 Choose and download models from [Piper Releases](https://github.com/rhasspy/piper/releases):
 
 **Popular English Models:**
@@ -117,14 +112,14 @@ wget https://github.com/rhasspy/piper/releases/download/v1.2.0/es_ES-mls_9972-lo
 wget https://github.com/rhasspy/piper/releases/download/v1.2.0/es_ES-mls_9972-low.onnx.json
 ```
 
-**3. Place model files in your project directory:**
+**2. Place model files in your project directory:**
 ```bash
 # Models should be in the same directory as your main.py
 ls *.onnx *.onnx.json
 # en_US-lessac-medium.onnx  en_US-lessac-medium.onnx.json
 ```
 
-**4. Update config.yaml:**
+**3. Update config.yaml:**
 ```yaml
 tts:
   provider: piper
@@ -157,8 +152,13 @@ tts:
 
 3. Install Python dependencies:
    ```bash
-   # Install core dependencies including AI providers
+   # Install core dependencies (includes Piper TTS by default)
    pip install -r requirements.txt
+   
+   # Alternative: Install specific TTS engine only
+   pip install -r requirements-tts-piper.txt    # Neural TTS (default, best quality)
+   pip install -r requirements-tts-pyttsx.txt   # System TTS (lightweight)
+   pip install -r requirements-tts-espeak.txt   # Direct eSpeak (minimal)
    
    # Full installation (all speech recognition engines)
    pip install -r requirements-full.txt
@@ -217,8 +217,14 @@ The system now supports multiple TTS providers with configurable settings:
 
 ```yaml
 tts:
-  provider: pyttsx  # Options: pyttsx, espeak, piper
+  provider: piper  # Options: piper, pyttsx, espeak (piper is default)
   providers:
+    piper:
+      model: en_US-lessac-medium
+      rate: 1.0
+      volume: 1.0
+      speaker_id: null
+      output_raw: false
     pyttsx:
       voice_id: "com.apple.voice.compact.en-US.Samantha"
       rate: 150
@@ -229,12 +235,6 @@ tts:
       volume: 80
       pitch: 50
       gap: 0
-    piper:
-      model: en_US-lessac-medium
-      rate: 1.0
-      volume: 1.0
-      speaker_id: null
-      output_raw: false
 
 speech:
   language: en-US  # Speech recognition language
@@ -272,77 +272,20 @@ The system supports multiple speech recognition engines with automatic fallback:
 
 The system supports multiple TTS providers with automatic availability detection and graceful fallback:
 
-#### 1. Pyttsx (Default)
-**Description:** Uses pyttsx3 library with eSpeak-NG backend  
-**Status:** ✅ Available on all platforms  
-**Quality:** Good, system voice support  
-**Requirements:** No additional installation (included in requirements.txt)
-
-**Configuration:**
-```yaml
-tts:
-  provider: pyttsx
-  providers:
-    pyttsx:
-      voice_id: "com.apple.voice.compact.en-US.Samantha"  # System voice ID
-      rate: 150      # Words per minute (50-400)
-      volume: 0.5    # Volume level (0.0-1.0)
-```
-
-#### 2. eSpeak-NG (Direct)
-**Description:** Direct subprocess calls to eSpeak-NG  
-**Status:** ⚠️ Requires system installation  
-**Quality:** Basic, robotic but clear  
-**Requirements:** Install eSpeak-NG system package
-
-**Installation:**
-```bash
-# macOS
-brew install espeak-ng
-
-# Ubuntu/Debian
-sudo apt-get install espeak-ng
-
-# Fedora/RHEL/CentOS
-sudo dnf install espeak-ng
-
-# Arch Linux
-sudo pacman -S espeak-ng
-```
-
-**Configuration:**
-```yaml
-tts:
-  provider: espeak
-  providers:
-    espeak:
-      voice: en        # Language/voice code
-      rate: 175        # Words per minute (80-450)
-      volume: 80       # Volume level (0-200, 100=normal)
-      pitch: 50        # Pitch level (0-99)
-      gap: 0           # Gap between words (10ms units)
-```
-
-**Available eSpeak voices:** Run `espeak-ng --voices` to see all available voices
-
-#### 3. Piper Neural TTS
+#### 1. Piper Neural TTS (Default)
 **Description:** High-quality neural text-to-speech  
-**Status:** ⚠️ Requires model download  
+**Status:** ✅ Included in requirements.txt, requires model download  
 **Quality:** Excellent, human-like  
-**Requirements:** Models must be downloaded separately
+**Requirements:** Neural voice models (see System Dependencies section above)
 
 **Installation:**
 ```bash
-# Install Piper (already in requirements.txt)
-pip install piper-tts>=1.3.0
-
-# Download a voice model (example)
-# Models available at: https://github.com/rhasspy/piper/releases
-# Download .onnx and .onnx.json files to your project directory
+# Install with specific requirements file
+pip install -r requirements-tts-piper.txt
 ```
 
 **Popular Models:**
-- `en_US-lessac-medium` - Female US English (recommended)
+- `en_US-lessac-medium` - Female US English (recommended, included)
 - `en_US-ljspeech-medium` - Female US English
 - `en_US-danny-low` - Male US English  
 - `en_GB-alan-medium` - Male UK English
@@ -362,15 +305,61 @@ tts:
       output_raw: false           # Stream raw audio
 ```
 
-**Model Download Instructions:**
-1. Visit [Piper Releases](https://github.com/rhasspy/piper/releases)
-2. Download both `.onnx` and `.onnx.json` files for your chosen model
-3. Place them in your project directory
-4. Update the `model` setting in config.yaml
+#### 2. Pyttsx (System TTS)
+**Description:** Uses pyttsx3 library with system TTS engines  
+**Status:** ✅ Available on all platforms, no setup required  
+**Quality:** Good, uses system voices  
+**Requirements:** No additional installation
+
+**Installation:**
+```bash
+# Install with specific requirements file
+pip install -r requirements-tts-pyttsx.txt
+```
+
+**Configuration:**
+```yaml
+tts:
+  provider: pyttsx
+  providers:
+    pyttsx:
+      voice_id: "com.apple.voice.compact.en-US.Samantha"  # System voice ID
+      rate: 150      # Words per minute (50-400)
+      volume: 0.5    # Volume level (0.0-1.0)
+```
+
+#### 3. eSpeak-NG (Direct)
+**Description:** Direct subprocess calls to eSpeak-NG  
+**Status:** ⚠️ Requires system installation  
+**Quality:** Basic, robotic but clear  
+**Requirements:** Install eSpeak-NG system package (see System Dependencies section above)
+
+**Installation:**
+```bash
+# Install with specific requirements file  
+pip install -r requirements-tts-espeak.txt
+
+# System installation required (see System Dependencies section)
+```
+
+**Configuration:**
+```yaml
+tts:
+  provider: espeak
+  providers:
+    espeak:
+      voice: en        # Language/voice code
+      rate: 175        # Words per minute (80-450)
+      volume: 80       # Volume level (0-200, 100=normal)
+      pitch: 50        # Pitch level (0-99)
+      gap: 0           # Gap between words (10ms units)
+```
+
+**Available eSpeak voices:** Run `espeak-ng --voices` to see all available voices
 
 #### Provider Selection Priority
-1. **Configured provider** (from config.yaml)
-2. **Automatic fallback** to pyttsx if configured provider fails
+1. **Piper Neural TTS** (default, highest quality)
+2. **Automatic fallback** to pyttsx if Piper fails or models unavailable
 3. **Availability detection** - unavailable providers are automatically skipped
 
 #### Testing TTS Providers

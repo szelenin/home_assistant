@@ -1,0 +1,8 @@
+# Requirements for Pyttsx TTS (System TTS)
+# Uses system text-to-speech engines with pyttsx3 wrapper
+
+# Core pyttsx dependencies
+pyttsx3>=2.90         # System TTS wrapper
+
+# Audio device management (optional, for enhanced audio control)
+sounddevice>=0.4.6    # Cross-platform audio device management

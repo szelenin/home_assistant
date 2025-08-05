@@ -1,0 +1,13 @@
+# Requirements for eSpeak-NG TTS (Direct)
+# Direct subprocess calls to eSpeak-NG system binary
+# Note: Requires eSpeak-NG system installation (see README.md)
+
+# No additional Python dependencies required
+# eSpeak-NG must be installed as system package:
+# - macOS: brew install espeak-ng  
+# - Ubuntu/Debian: sudo apt-get install espeak-ng
+# - Fedora: sudo dnf install espeak-ng
+# - Arch: sudo pacman -S espeak-ng
+
+# Optional audio device management
+sounddevice>=0.4.6    # For enhanced audio control (optional)
