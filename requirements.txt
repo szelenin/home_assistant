@@ -10,6 +10,8 @@ openai>=1.0.0     # For ChatGPT integration
 
 # TTS Provider dependencies
 piper-tts>=1.3.0  # For Piper neural TTS
+numpy>=1.21.0     # For Piper audio processing
+soundfile>=0.10.0 # For Piper audio file handling
 
 # Optional dependencies for advanced speech recognition
 # google-cloud-speech  # For Google Speech-to-Text
