@@ -11,9 +11,24 @@ speech:
   - vosk
   - sphinx
 tts:
-  rate: 150
-  voice_id: com.apple.voice.compact.en-US.Samantha
-  volume: 1.0
+  provider: pyttsx  # Options: pyttsx, espeak, piper
+  providers:
+    pyttsx:
+      voice_id: com.apple.voice.compact.en-US.Samantha
+      rate: 150
+      volume: 0.5
+    espeak:
+      voice: en
+      rate: 175
+      volume: 80
+      pitch: 50
+      gap: 0
+    piper:
+      model: en_US-lessac-medium
+      rate: 1.0
+      volume: 1.0
+      speaker_id: null
+      output_raw: false
 wake_word:
   name: TestAssistant
   sensitivity: 0.5

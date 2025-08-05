@@ -1,31 +1,29 @@
-import pyttsx3
-import sounddevice as sd
 import yaml
 import os
-from typing import Optional
+from typing import Optional, Dict, Any
 from ..utils.logger import setup_logging
+from .base_tts_provider import BaseTTSProvider, TTSConfigurationError, TTSProviderUnavailableError
+from .providers.pyttsx_provider import PyttsxTTSProvider
+from .providers.espeak_provider import EspeakTTSProvider
+from .providers.piper_provider import PiperTTSProvider
 
 
 class TextToSpeech:
-    def __init__(self, voice_id=None, rate=None, volume=None):
-        self.engine = None
+    """Factory-based Text-to-Speech system supporting multiple TTS providers."""
+    
+    def __init__(self, provider_name: Optional[str] = None):
         self.logger = setup_logging("home_assistant.tts")
-        
-        # Load configuration from config.yaml
         self.config = self._load_config()
         
-        # Use provided parameters or fall back to config values
-        self.voice_id = voice_id or self.config.get('tts', {}).get('voice_id', "com.apple.voice.compact.en-US.Samantha")
-        self.rate = rate or self.config.get('tts', {}).get('rate', 150)
-        self.volume = volume or self.config.get('tts', {}).get('volume', 1.0)
+        # Determine which provider to use
+        self.provider_name = provider_name or self.config.get('tts', {}).get('provider', 'pyttsx')
         
-        # Debug output
-        self.logger.debug(f"TTS Config loaded - Voice ID: {self.voice_id}, Rate: {self.rate}, Volume: {self.volume}")
+        # Initialize the TTS provider
+        self.provider = self._create_provider()
         
-        self._check_audio_devices()
-        self._initialize_engine()
+        self.logger.info(f"TTS initialized with {self.provider_name} provider")
     
-    def _load_config(self):
+    def _load_config(self) -> Dict[str, Any]:
         """Load configuration from config.yaml file."""
         config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'config.yaml')
         try:
@@ -35,190 +33,98 @@ class TextToSpeech:
             self.logger.warning(f"Could not load config.yaml: {e}. Using default TTS settings")
             return {}
     
-    def _check_audio_devices(self):
-        """Check and display available audio devices."""
-        try:
-            devices = sd.query_devices()
-            self.logger.info(f"Found {len(devices)} audio devices")
-            
-            output_devices = []
-            for i, device in enumerate(devices):
-                if device['max_output_channels'] > 0:
-                    output_devices.append((i, device))
-                    self.logger.debug(f"Output {i}: {device['name']} (channels: {device['max_output_channels']})")
-            
-            # Try to set default device like in test_tts_detailed.py
-            try:
-                sd.default.device = None  # Use system default
-                self.logger.info("Audio device configuration successful")
-            except Exception as e:
-                self.logger.warning(f"Audio device configuration warning: {e}")
-                
-        except Exception as e:
-            self.logger.error(f"Audio device check failed: {e}")
-        
-        # Ensure system volume is adequate for TTS
-        self._ensure_system_volume()
-    
-    def _ensure_system_volume(self):
-        """Ensure system volume is adequate for TTS."""
-        try:
-            import subprocess
-            # Check current system volume
-            result = subprocess.run(['osascript', '-e', 'output volume of (get volume settings)'], 
-                                  capture_output=True, text=True)
-            current_volume = int(result.stdout.strip())
-            
-            # If volume is too low, increase it
-            if current_volume < 50:
-                subprocess.run(['osascript', '-e', 'set volume output volume 75'], 
-                              capture_output=True)
-                self.logger.info(f"System volume was {current_volume}%, increased to 75% for TTS")
-            
-        except Exception as e:
-            self.logger.warning(f"Could not adjust system volume: {e}")
-    
-    def _initialize_engine(self):
-        """Initialize the TTS engine."""
-        try:
-            self.engine = pyttsx3.init()
-            self._configure_voice()
-        except Exception as e:
-            self.logger.error(f"Failed to initialize TTS engine: {e}")
-            self.engine = None
-    
-    def _configure_voice(self):
-        """Configure voice properties."""
-        if not self.engine:
-            return
+    def _create_provider(self) -> BaseTTSProvider:
+        """Create TTS provider based on configuration."""
+        provider_config = self.config.get('tts', {}).get('providers', {}).get(self.provider_name, {})
         
         try:
-            # Set rate and volume BEFORE voice selection
-            self.engine.setProperty('rate', self.rate)
-            self.engine.setProperty('volume', self.volume)
-            
-            # Get all available voices first
-            voices = self.engine.getProperty('voices')
-            if voices:
-                self.logger.info(f"Found {len(voices)} available voices")
-                for i, voice in enumerate(voices):
-                    gender = voice.gender if hasattr(voice, 'gender') else 'Unknown'
-                    languages = voice.languages if hasattr(voice, 'languages') else []
-                    self.logger.debug(f"Voice {i}: {voice.name} (ID: {voice.id}, Gender: {gender}, Languages: {languages})")
-                
-                # Use specified voice or default selection
-                if self.voice_id:
-                    # Try to find the specified voice
-                    voice_found = False
-                    for voice in voices:
-                        if voice.id == self.voice_id:
-                            self.engine.setProperty('voice', voice.id)
-                            self.logger.info(f"Using specified voice: {voice.name}")
-                            voice_found = True
-                            break
-                    
-                    if not voice_found:
-                        self.logger.warning(f"Specified voice ID '{self.voice_id}' not found, using default")
-                        self._select_default_voice(voices)
-                else:
-                    self._select_default_voice(voices)
-            
-            # Set rate and volume AGAIN after voice selection
-            self.engine.setProperty('rate', self.rate)
-            self.engine.setProperty('volume', self.volume)
-            
-            # Double-check and force the rate again
-            current_rate = self.engine.getProperty('rate')
-            if current_rate != self.rate:
-                self.logger.warning(f"Rate mismatch: expected {self.rate}, got {current_rate}, forcing...")
-                self.engine.setProperty('rate', self.rate)
-                # Try one more time
-                if self.engine.getProperty('rate') != self.rate:
-                    self.logger.warning("Rate still not set correctly. This is a known pyttsx3 limitation on macOS.")
-                    
-            # Print current settings for debugging
-            final_rate = self.engine.getProperty('rate')
-            final_volume = self.engine.getProperty('volume')
-            self.logger.info(f"TTS configured - Rate: {final_rate}, Volume: {final_volume}")
-            
-        except Exception as e:
-            self.logger.error(f"Failed to configure voice: {e}")
+            if self.provider_name == 'pyttsx':
+                return PyttsxTTSProvider(provider_config)
+            elif self.provider_name == 'espeak':
+                return EspeakTTSProvider(provider_config)
+            elif self.provider_name == 'piper':
+                return PiperTTSProvider(provider_config)
+            else:
+                self.logger.warning(f"Unknown TTS provider '{self.provider_name}', falling back to pyttsx")
+                return PyttsxTTSProvider(provider_config)
+        except (TTSConfigurationError, TTSProviderUnavailableError) as e:
+            self.logger.error(f"Failed to initialize {self.provider_name} provider: {e}")
+            # Try to fallback to pyttsx if it's not already the current provider
+            if self.provider_name != 'pyttsx':
+                self.logger.info("Attempting fallback to pyttsx provider...")
+                try:
+                    fallback_config = self.config.get('tts', {}).get('providers', {}).get('pyttsx', {})
+                    return PyttsxTTSProvider(fallback_config)
+                except Exception as fallback_error:
+                    self.logger.error(f"Fallback to pyttsx also failed: {fallback_error}")
+            raise e
     
-    def _select_default_voice(self, voices):
-        """Select default voice based on preferences."""
-        # Prefer female voice if available, otherwise use first available
-        for voice in voices:
-            if hasattr(voice, 'gender') and voice.gender and 'female' in voice.gender.lower():
-                self.engine.setProperty('voice', voice.id)
-                self.logger.info(f"Using female voice: {voice.name}")
-                return
+    def get_available_providers(self) -> Dict[str, bool]:
+        """Get list of available TTS providers and their availability status."""
+        providers = {
+            'pyttsx': False,
+            'espeak': False,
+            'piper': False
+        }
         
-        # If no female voice found, use the first available
-        if voices:
-            self.engine.setProperty('voice', voices[0].id)
-            self.logger.info(f"Using default voice: {voices[0].name}")
+        # Test each provider
+        try:
+            provider = PyttsxTTSProvider({})
+            providers['pyttsx'] = provider.is_available()
+        except Exception:
+            pass
+        
+        try:
+            provider = EspeakTTSProvider({})
+            providers['espeak'] = provider.is_available()
+        except Exception:
+            pass
+        
+        try:
+            provider = PiperTTSProvider({})
+            providers['piper'] = provider.is_available()
+        except Exception:
+            pass
+        
+        return providers
+    
+    def get_provider_info(self) -> Dict[str, Any]:
+        """Get information about the current TTS provider."""
+        return self.provider.get_provider_info()
+    
+    def get_available_voices(self):
+        """Get list of available voices from current provider."""
+        return self.provider.get_available_voices()
+    
+    def is_available(self) -> bool:
+        """Check if current TTS provider is available."""
+        return self.provider.is_available()
     
     def list_voices(self):
         """List all available voices with details."""
-        if not self.engine:
-            self.logger.error("TTS engine not available")
-            return
-        
-        voices = self.engine.getProperty('voices')
+        voices = self.provider.get_available_voices()
         if voices:
-            self.logger.info(f"Available Voices ({len(voices)} total)")
+            self.logger.info(f"Available Voices for {self.provider_name} ({len(voices)} total)")
             for i, voice in enumerate(voices):
-                gender = voice.gender if hasattr(voice, 'gender') else 'Unknown'
-                languages = voice.languages if hasattr(voice, 'languages') else []
-                self.logger.info(f"Voice {i+1}: {voice.name} (ID: {voice.id}, Gender: {gender}, Languages: {languages})")
+                self.logger.info(f"Voice {i+1}: {voice['name']} (ID: {voice['id']}, Language: {voice['language']}, Gender: {voice['gender']})")
         else:
-            self.logger.error("No voices found")
+            self.logger.error(f"No voices found for {self.provider_name} provider")
     
-    def set_voice(self, voice_id):
+    def set_voice(self, voice_id: str) -> bool:
         """Set a specific voice by ID."""
-        if not self.engine:
-            self.logger.error("TTS engine not available")
-            return False
-        
-        try:
-            self.engine.setProperty('voice', voice_id)
-            self.logger.info(f"Voice set to: {voice_id}")
-            return True
-        except Exception as e:
-            self.logger.error(f"Failed to set voice: {e}")
-            return False
+        return self.provider.set_voice(voice_id)
     
-    def set_rate(self, rate):
+    def set_rate(self, rate: int) -> bool:
         """Set speech rate (words per minute)."""
-        if not self.engine:
-            self.logger.error("TTS engine not available")
-            return False
-        
-        try:
-            self.engine.setProperty('rate', rate)
-            self.logger.info(f"Speech rate set to: {rate} WPM")
-            return True
-        except Exception as e:
-            self.logger.error(f"Failed to set rate: {e}")
-            return False
+        return self.provider.set_rate(rate)
     
-    def set_volume(self, volume):
+    def set_volume(self, volume: float) -> bool:
         """Set volume (0.0 to 1.0)."""
-        if not self.engine:
-            self.logger.error("TTS engine not available")
-            return False
-        
-        try:
-            self.engine.setProperty('volume', volume)
-            self.logger.info(f"Volume set to: {volume}")
-            return True
-        except Exception as e:
-            self.logger.error(f"Failed to set volume: {e}")
-            return False
+        return self.provider.set_volume(volume)
     
     def speak(self, text: str) -> bool:
         """
-        Speak the given text.
+        Speak the given text using the current TTS provider.
         
         Args:
             text: The text to speak
@@ -226,55 +132,4 @@ class TextToSpeech:
         Returns:
             bool: True if successful, False otherwise
         """
-        if not self.engine:
-            self.logger.warning(f"TTS not available, would say: {text}")
-            return False
-        
-        # Validate input text
-        if not text or not text.strip():
-            self.logger.warning("Empty or whitespace-only text provided, skipping TTS")
-            return False
-        
-        try:
-            # Preprocess text like in working version
-            text = text.replace(",", "")
-            
-            self.logger.info(f"Speaking: {text}")
-            
-            # Force stop any previous speech
-            try:
-                self.engine.stop()
-            except:
-                pass  # Ignore errors if engine is already stopped
-            
-            # Force audio device check and volume reset
-            self._check_audio_devices()
-            
-            # Set properties again to ensure they're applied
-            self.engine.setProperty('rate', self.rate)
-            self.engine.setProperty('volume', self.volume)
-            
-            # Force volume to maximum for reliability
-            self.engine.setProperty('volume', 1.0)
-            
-            # Speak the text
-            self.engine.say(text)
-            self.engine.runAndWait()
-            
-            # Force stop after speaking
-            try:
-                self.engine.stop()
-            except:
-                pass
-            
-            self.logger.info("TTS completed successfully")
-            return True
-        except Exception as e:
-            self.logger.error(f"Failed to speak text: {e}")
-            # Try to reinitialize engine on error
-            try:
-                self._initialize_engine()
-                self._configure_voice()
-            except Exception as reinit_error:
-                self.logger.error(f"Failed to reinitialize engine: {reinit_error}")
-            return False
+        return self.provider.speak(text)
