@@ -25,32 +25,121 @@ A Python-based voice-controlled home automation system with speech recognition a
 
 ### System Dependencies
 
-**For macOS:**
-```bash
-# Install PortAudio (required for PyAudio)
-brew install portaudio
+#### Core Dependencies (Required)
 
-# Install eSpeak-NG (optional, for direct eSpeak TTS provider)
+**PortAudio** - Required for speech recognition (PyAudio)
+
+**macOS:**
+```bash
+brew install portaudio
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get install portaudio19-dev python3-pyaudio
+```
+
+**Fedora/RHEL/CentOS:**
+```bash
+sudo dnf install portaudio-devel
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S portaudio
+```
+
+#### TTS Engine Dependencies (Optional)
+
+Choose the TTS engines you want to use. The default `pyttsx` provider works without additional system dependencies.
+
+##### eSpeak-NG (Direct Provider)
+For using the direct eSpeak TTS provider:
+
+**macOS:**
+```bash
 brew install espeak-ng
 ```
 
-**For Ubuntu/Debian:**
+**Ubuntu/Debian:**
 ```bash
-# Install PortAudio
-sudo apt-get install portaudio19-dev python3-pyaudio
-
-# Install eSpeak-NG (optional, for direct eSpeak TTS provider)
 sudo apt-get install espeak-ng
 ```
 
-**For other Linux distributions:**
+**Fedora/RHEL/CentOS:**
 ```bash
-# Fedora/RHEL/CentOS
-sudo dnf install portaudio-devel espeak-ng
-
-# Arch Linux
-sudo pacman -S portaudio espeak-ng
+sudo dnf install espeak-ng
 ```
+
+**Arch Linux:**
+```bash
+sudo pacman -S espeak-ng
+```
+
+##### Piper Neural TTS (Model Download Required)
+Piper TTS requires downloading neural voice models:
+
+**1. Install Piper (handled by pip in requirements.txt):**
+```bash
+pip install piper-tts>=1.3.0
+```
+
+**2. Download Voice Models:**
+Choose and download models from [Piper Releases](https://github.com/rhasspy/piper/releases):
+
+**Popular English Models:**
+```bash
+# Download en_US-lessac-medium (Female US English) - Recommended
+wget https://github.com/rhasspy/piper/releases/download/v1.2.0/en_US-lessac-medium.onnx
+wget https://github.com/rhasspy/piper/releases/download/v1.2.0/en_US-lessac-medium.onnx.json
+
+# Download en_US-danny-low (Male US English)
+wget https://github.com/rhasspy/piper/releases/download/v1.2.0/en_US-danny-low.onnx
+wget https://github.com/rhasspy/piper/releases/download/v1.2.0/en_US-danny-low.onnx.json
+
+# Download en_GB-alan-medium (Male UK English)
+wget https://github.com/rhasspy/piper/releases/download/v1.2.0/en_GB-alan-medium.onnx
+wget https://github.com/rhasspy/piper/releases/download/v1.2.0/en_GB-alan-medium.onnx.json
+```
+
+**Other Languages:**
+```bash
+# German
+wget https://github.com/rhasspy/piper/releases/download/v1.2.0/de_DE-thorsten-medium.onnx
+wget https://github.com/rhasspy/piper/releases/download/v1.2.0/de_DE-thorsten-medium.onnx.json
+
+# French
+wget https://github.com/rhasspy/piper/releases/download/v1.2.0/fr_FR-mls_1840-low.onnx
+wget https://github.com/rhasspy/piper/releases/download/v1.2.0/fr_FR-mls_1840-low.onnx.json
+
+# Spanish
+wget https://github.com/rhasspy/piper/releases/download/v1.2.0/es_ES-mls_9972-low.onnx
+wget https://github.com/rhasspy/piper/releases/download/v1.2.0/es_ES-mls_9972-low.onnx.json
+```
+
+**3. Place model files in your project directory:**
+```bash
+# Models should be in the same directory as your main.py
+ls *.onnx *.onnx.json
+# en_US-lessac-medium.onnx  en_US-lessac-medium.onnx.json
+```
+
+**4. Update config.yaml:**
+```yaml
+tts:
+  provider: piper
+  providers:
+    piper:
+      model: en_US-lessac-medium  # Model name without .onnx extension
+```
+
+**Model Size Reference:**
+- **X-Low quality**: ~20MB, basic quality, fast
+- **Low quality**: ~40MB, good quality, fast  
+- **Medium quality**: ~60MB, high quality, moderate speed
+- **High quality**: ~100MB+, excellent quality, slower
+
+**Browse all available models**: [Piper Voice Samples](https://rhasspy.github.io/piper-samples/)
 
 ### Installation
 
