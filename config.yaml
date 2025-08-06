@@ -5,11 +5,19 @@ audio:
   chunk_size: 512
   sample_rate: 16000
 speech:
+  provider: vosk  # Options: vosk, google, whisper
   language: en-US
-  recognition_engines:
-  - google
-  - vosk
-  - sphinx
+  providers:
+    vosk:
+      model_path: "./vosk-model-small-en-us-0.15"
+      confidence_threshold: 0.8
+      sample_rate: 16000
+    google:
+      show_all: false
+    whisper:
+      model: base
+      device: cpu
+      temperature: 0.0
 tts:
   provider: piper  # Options: piper, pyttsx, espeak
   providers:

@@ -6,6 +6,7 @@ A Python-based voice-controlled home automation system with speech recognition a
 
 - **Voice Control**: Speech recognition for hands-free operation
 - **Multi-Provider Text-to-Speech**: Support for pyttsx3, eSpeak-NG, and Piper neural TTS with configurable providers
+- **Multi-Provider Speech Recognition**: Support for Vosk (offline), Google (online), and OpenAI Whisper (offline) with configurable providers
 - **Wake Word Detection**: Customizable wake word for activation
 - **AI Integration**: Claude (Anthropic) and ChatGPT (OpenAI) support with automatic fallback
 - **Intent Recognition**: Understands weather, device control, personal info, and general questions
@@ -13,7 +14,6 @@ A Python-based voice-controlled home automation system with speech recognition a
 - **Device Management**: Control smart lights, thermostats, and other IoT devices
 - **Automation**: Create custom automation rules for your smart home
 - **Configuration**: YAML-based configuration system
-- **Multi-Engine Speech Recognition**: Support for Google, Vosk, Sphinx, and Whisper
 
 ## Getting Started
 
@@ -48,6 +48,118 @@ sudo dnf install portaudio-devel
 ```bash
 sudo pacman -S portaudio
 ```
+
+#### Speech Recognition Engine Dependencies (Optional)
+
+Choose the speech recognition engines you want to use. The default `vosk` provider offers excellent offline recognition ideal for Raspberry Pi deployment.
+
+##### Vosk Offline Speech Recognition (Default)
+**Description:** Lightweight offline speech recognition, perfect for Raspberry Pi  
+**Documentation:** [Vosk API Docs](https://alphacephei.com/vosk/) • [GitHub](https://github.com/alphacep/vosk-api)  
+**Voice Samples:** [Demo Page](https://alphacephei.com/vosk/samples) • Test with various languages and accents
+
+**Installation:**
+1. **Download Models** from [Vosk Models](https://alphacephei.com/vosk/models):
+```bash
+# Recommended for Raspberry Pi (40MB, fast)
+curl -LO https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+unzip vosk-model-small-en-us-0.15.zip
+
+# Better accuracy (50MB, balanced)
+curl -LO https://alphacephei.com/vosk/models/vosk-model-en-us-0.22.zip
+unzip vosk-model-en-us-0.22.zip
+
+# Highest accuracy (1.8GB, resource intensive)
+curl -LO https://alphacephei.com/vosk/models/vosk-model-en-us-0.42-gigaspeech.zip
+unzip vosk-model-en-us-0.42-gigaspeech.zip
+```
+
+2. **Configure:**
+```yaml
+speech:
+  provider: vosk
+  providers:
+    vosk:
+      model_path: "./vosk-model-small-en-us-0.15"
+      confidence_threshold: 0.8  # 0.0-1.0
+      sample_rate: 16000
+```
+
+**Available Languages:** English, German, French, Spanish, Russian, Portuguese, Turkish, Vietnamese, Italian, Dutch, Catalan, Arabic, Greek, Farsi, Filipino, Ukrainian, Kazakh, Swedish, Japanese, Esperanto, Hindi, Czech, Polish, Uzbek, Korean, Brazilian Portuguese, Chinese
+
+**Model Comparison:**
+- **Small** (40MB): ~85% accuracy, 0.5s latency, ideal for Pi
+- **Medium** (50MB): ~90% accuracy, 1s latency, balanced choice  
+- **Large** (1.8GB): ~95% accuracy, 2s latency, desktop/server use
+
+##### Google Speech Recognition (Online)
+**Description:** High-accuracy online speech recognition with extensive language support  
+**Documentation:** [Google Speech-to-Text](https://cloud.google.com/speech-to-text) • [Python Client](https://github.com/googleapis/python-speech)  
+**Voice Samples:** [Language Support](https://cloud.google.com/speech-to-text/docs/languages) • 125+ languages and variants
+
+**Installation:** Included with `SpeechRecognition` library (no additional setup)
+
+**Configuration:**
+```yaml
+speech:
+  provider: google
+  providers:
+    google:
+      show_all: false  # true = confidence scores, false = best result only
+```
+
+**Free Tier Limits:**
+- **No API key** required for basic usage via SpeechRecognition library
+- **60 minutes/month** free recognition time
+- **15-second clips** maximum per request
+- **Rate limited** but suitable for personal/development use
+- **Internet required** for all requests
+
+**Supported Features:**
+- **Automatic punctuation** and capitalization
+- **Profanity filtering** available
+- **Real-time streaming** (with Cloud Speech API)
+- **Noise robustness** excellent in various environments
+
+**Languages:** English (US/UK/AU/IN), Spanish, French, German, Italian, Portuguese, Russian, Japanese, Korean, Mandarin, Hindi, Arabic, Dutch, Polish, Turkish, and 100+ more
+
+##### OpenAI Whisper (Offline)
+**Description:** State-of-the-art offline speech recognition with exceptional multilingual support  
+**Documentation:** [Whisper GitHub](https://github.com/openai/whisper) • [Model Card](https://github.com/openai/whisper/blob/main/model-card.md) • [Paper](https://arxiv.org/abs/2212.04356)  
+**Voice Samples:** [Interactive Demo](https://huggingface.co/spaces/openai/whisper) • Test with 99 languages
+
+**Installation:** Included with requirements.txt (`openai-whisper` package)
+
+**Models:** Auto-downloaded on first use from Hugging Face:
+| Model | Size | VRAM | Speed | WER* |
+|-------|------|------|--------|-----|
+| **tiny** | 39MB | ~1GB | ~32x | 9.4% |
+| **base** | 74MB | ~1GB | ~16x | 7.0% |
+| **small** | 244MB | ~2GB | ~6x | 5.7% |
+| **medium** | 769MB | ~5GB | ~2x | 4.9% |
+| **large** | 1550MB | ~10GB | 1x | **4.3%** |
+
+*WER = Word Error Rate (lower is better)
+
+**Configuration:**
+```yaml
+# For Raspberry Pi - use tiny/base models
+speech:
+  provider: whisper
+  providers:
+    whisper:
+      model: base         # tiny, base, small, medium, large
+      device: cpu         # cpu or cuda
+      temperature: 0.0    # 0.0 = deterministic, higher = more creative
+```
+
+**Supported Languages:** Afrikaans, Arabic, Armenian, Azerbaijani, Belarusian, Bosnian, Bulgarian, Catalan, Chinese, Croatian, Czech, Danish, Dutch, English, Estonian, Finnish, French, Galician, German, Greek, Hebrew, Hindi, Hungarian, Icelandic, Indonesian, Italian, Japanese, Kannada, Kazakh, Korean, Latvian, Lithuanian, Macedonian, Malay, Marathi, Maori, Nepali, Norwegian, Persian, Polish, Portuguese, Romanian, Russian, Serbian, Slovak, Slovenian, Spanish, Swahili, Swedish, Tagalog, Tamil, Thai, Turkish, Ukrainian, Urdu, Vietnamese, Welsh, and more
+
+**Hardware Requirements:**
+- **CPU**: 2+ cores recommended, 4+ for larger models
+- **RAM**: 4GB+ (8GB+ for medium/large models)
+- **GPU**: CUDA-compatible GPU optional but provides 5-10x speedup
+- **Disk**: 40MB-1.5GB depending on model
 
 #### TTS Engine Dependencies (Optional)
 
@@ -152,16 +264,8 @@ tts:
 
 3. Install Python dependencies:
    ```bash
-   # Install core dependencies (includes Piper TTS by default)
+   # Install all dependencies (includes TTS providers and speech recognition engines)
    pip install -r requirements.txt
-   
-   # Alternative: Install specific TTS engine only
-   pip install -r requirements-tts-piper.txt    # Neural TTS (default, best quality)
-   pip install -r requirements-tts-pyttsx.txt   # System TTS (lightweight)
-   pip install -r requirements-tts-espeak.txt   # Direct eSpeak (minimal)
-   
-   # Full installation (all speech recognition engines)
-   pip install -r requirements-full.txt
    ```
 
 4. Configure AI Provider (Required):
@@ -237,36 +341,63 @@ tts:
       gap: 0
 
 speech:
-  language: en-US  # Speech recognition language
-  recognition_engines:
-    - google  # Primary (requires internet)
-    - vosk    # Secondary (offline fallback)
-    - sphinx  # Tertiary (offline fallback)
+  provider: vosk  # Options: vosk, google, whisper
+  language: en-US
+  providers:
+    vosk:
+      model_path: "./vosk-model-en-us-0.22"
+      confidence_threshold: 0.8
+      sample_rate: 16000
+    google:
+      show_all: false
+    whisper:
+      model: base
+      device: cpu
+      temperature: 0.0
 
 wake_word:
   name: null  # Custom wake word (null for default)
   sensitivity: 0.5  # Wake word sensitivity
 ```
 
-### Speech Recognition Engines
+### Speech Recognition Providers
 
-The system supports multiple speech recognition engines with automatic fallback:
+The system supports multiple speech recognition providers with configurable selection (no fallback - single provider operation):
 
-**Online Engines:**
-- **Google Speech Recognition** (default) - High accuracy, requires internet
-- **Google Cloud Speech** - Enterprise-grade, requires API key
-- **Azure Speech Services** - Microsoft's speech recognition
-- **Amazon Transcribe** - AWS speech recognition
+#### Quick Comparison
 
-**Offline Engines:**
-- **Vosk** - Fast, accurate offline recognition
-- **Sphinx** - CMU's offline speech recognition
-- **Whisper** - OpenAI's offline speech recognition
+| Provider | Type | Accuracy | Speed | Languages | Best Use Case |
+|----------|------|----------|--------|-----------|---------------|
+| **Vosk** | Offline | 85-95% | Fast | 25+ | Raspberry Pi, Privacy |
+| **Google** | Online | 95%+ | Very Fast | 125+ | High accuracy + Internet |
+| **Whisper** | Offline | 95%+ | Slow | 99+ | Best offline accuracy |
 
-**Engine Priority:**
-1. **Google** (online, best accuracy)
-2. **Vosk** (offline, good accuracy)
-3. **Sphinx** (offline, basic accuracy)
+#### 1. Vosk Offline Recognition (Default) 🥇
+**Status:** ✅ Included • Requires model download  
+**Strengths:** Lightweight, fast, privacy-friendly, Pi-optimized  
+**Weaknesses:** Limited language models compared to cloud services  
+
+**Ideal for:** Raspberry Pi deployments, offline environments, privacy-critical applications
+
+#### 2. Google Speech Recognition (Online) 🌐
+**Status:** ✅ Included • No setup required  
+**Strengths:** Excellent accuracy, 60min/month free, vast language support  
+**Weaknesses:** Internet dependent, usage limits, privacy concerns  
+
+**Ideal for:** Development, testing, applications with reliable internet
+
+#### 3. OpenAI Whisper (Offline) 🎯
+**Status:** ✅ Included • Auto-downloads models  
+**Strengths:** State-of-the-art accuracy, 99 languages, robust to noise  
+**Weaknesses:** Resource intensive, slow on CPU, large models  
+
+**Ideal for:** Desktop/server deployments, multilingual needs, batch processing
+
+#### Provider Architecture
+- **Single provider operation** - no automatic fallbacks
+- **Factory pattern** - consistent with TTS system  
+- **Configuration-driven** - select provider in config.yaml
+- **Provider-specific optimizations** - each engine tuned independently
 
 ### Text-to-Speech Providers
 
@@ -375,6 +506,29 @@ print('Available providers:', tts.get_available_providers())
 "
 ```
 
+#### Testing Speech Recognition Providers
+```bash
+# Test all available speech recognition providers
+python tests/integration/test_recognizer.py
+
+# Check provider availability
+python -c "
+from home_assistant.speech.recognizer import SpeechRecognizer
+recognizer = SpeechRecognizer()
+print('Available providers:', recognizer.get_available_providers())
+"
+
+# Test specific provider
+python -c "
+from home_assistant.speech.recognizer import SpeechRecognizer
+recognizer = SpeechRecognizer('vosk')  # or 'google', 'whisper'
+print('Testing provider:', recognizer.provider_name)
+print('Provider info:', recognizer.get_provider_info())
+success, text = recognizer.listen_for_speech(timeout=2)
+print('Recognition result:', success, text)
+"
+```
+
 ### Available Voices
 
 #### Pyttsx Voices (System Voices)
@@ -436,8 +590,8 @@ python tests/run_scenarios.py --scenario tts
 # Test multi-provider TTS system (new)
 python tests/integration/test_tts.py
 
-# Test speech recognition
-python tests/run_scenarios.py --scenario recognizer
+# Test speech recognition (new provider-based system)
+python tests/integration/test_recognizer.py
 
 # Test integration between TTS and recognizer
 python tests/run_scenarios.py --scenario integration
@@ -495,7 +649,7 @@ tests/
 - Ambient noise adjustment
 - Single speech recognition
 - Continuous recognition
-- Engine fallback testing
+- Provider availability testing
 
 **🎤🎵 Integration Scenarios:**
 - Speak and listen (TTS → Recognizer)
@@ -554,9 +708,63 @@ home_assistant/
 ## Troubleshooting
 
 ### Speech Recognition Issues
+
+#### General Speech Recognition Issues
 - **"Could not find PyAudio"**: Install PortAudio first, then PyAudio
 - **Microphone not working**: Check system permissions and microphone settings
 - **Speech not recognized**: Ensure good microphone quality and clear speech
+- **Provider not available**: Check system dependencies and model installations
+
+#### Vosk Issues
+- **"Unable to find model" error**: Download and extract Vosk language model
+  1. Visit [Vosk Models](https://alphacephei.com/vosk/models)
+  2. Download appropriate model for your language
+  3. Extract to project directory
+  4. Update `model_path` in config.yaml
+- **Model loading slow**: Large models take time to load initially
+- **Low recognition accuracy**: Try adjusting confidence_threshold or using larger model
+- **Memory usage high**: Use smaller models (vosk-model-small-* variants)
+
+#### Google Speech Issues
+- **"No internet connection"**: Google Speech requires internet connectivity
+- **Recognition quota exceeded**: Google's free tier has usage limits
+- **Recognition timeout**: Short audio clips work better with free tier
+- **API errors**: Check internet connection and Google services status
+
+#### Whisper Issues
+- **Model download slow**: Whisper downloads models automatically on first use
+- **High CPU usage**: Whisper is computationally intensive
+  - Use smaller models ('tiny', 'base') on slower hardware
+  - Consider CPU vs GPU settings in config
+- **Recognition too slow**: Try 'tiny' model for faster processing
+- **Out of memory**: Use smaller models or increase system RAM
+- **CUDA errors**: Set device to 'cpu' if GPU acceleration fails
+
+#### Debugging Speech Recognition Issues
+```bash
+# Check provider availability
+python -c "
+from home_assistant.speech.recognizer import SpeechRecognizer
+recognizer = SpeechRecognizer()
+print('Available providers:', recognizer.get_available_providers())
+for name, available in recognizer.get_available_providers().items():
+    if available:
+        provider_recognizer = SpeechRecognizer(name)
+        print(f'{name} info:', provider_recognizer.get_provider_info())
+"
+
+# Test specific provider with verbose logging
+python -c "
+import logging
+logging.basicConfig(level=logging.DEBUG)
+from home_assistant.speech.recognizer import SpeechRecognizer
+recognizer = SpeechRecognizer('vosk')  # or 'google', 'whisper'
+print('Testing provider:', recognizer.provider_name)
+print('Is available:', recognizer.is_available())
+success, text = recognizer.listen_for_speech(timeout=5)
+print('Result:', success, text)
+"
+```
 
 ### Text-to-Speech Issues
 

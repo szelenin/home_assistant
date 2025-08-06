@@ -13,11 +13,14 @@ piper-tts>=1.3.0  # For Piper neural TTS
 numpy>=1.21.0     # For Piper audio processing
 soundfile>=0.10.0 # For Piper audio file handling
 
+# Speech Recognition Provider dependencies
+vosk>=0.3.45          # For Vosk offline speech recognition (default provider)
+openai-whisper>=20231117  # For OpenAI Whisper speech recognition
+# SpeechRecognition>=3.10.0 already included above for Google provider
+
 # Optional dependencies for advanced speech recognition
-# google-cloud-speech  # For Google Speech-to-Text
-# openai-whisper      # For OpenAI Whisper
-# vosk>=0.3.45        # For Vosk offline speech recognition
-# pocketsphinx>=0.1.15 # For CMU Sphinx offline recognition
+# google-cloud-speech  # For Google Cloud Speech-to-Text API
+# pocketsphinx>=0.1.15 # For CMU Sphinx offline recognition (legacy)
 
 # Development and testing dependencies
 # pytest>=7.0.0
