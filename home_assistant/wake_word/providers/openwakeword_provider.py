@@ -63,13 +63,40 @@ class OpenWakeWordProvider(BaseWakeWordProvider):
             import openwakeword
             from openwakeword import Model
             
-            # Initialize the model
-            self.oww_model = Model(
-                wakeword_models=[self.model_path],
-                inference_framework=self.inference_framework
-            )
+            # Initialize the model with proper file paths
+            if os.path.isdir(self.model_path):
+                # Load specific wake word models from directory
+                wake_word_models = []
+                model_extension = '.onnx' if self.inference_framework == 'onnx' else '.tflite'
+                
+                for filename in os.listdir(self.model_path):
+                    if (filename.endswith(model_extension) and 
+                        not filename.startswith(('embedding_', 'melspectrogram', 'silero_'))):
+                        wake_word_models.append(os.path.join(self.model_path, filename))
+                
+                if wake_word_models:
+                    self.logger.debug(f"Loading wake word models: {wake_word_models}")
+                    self.oww_model = Model(
+                        wakeword_models=wake_word_models,
+                        inference_framework=self.inference_framework
+                    )
+                else:
+                    # Fallback: load all available pre-trained models
+                    self.logger.debug("No specific models found, loading all pre-trained models")
+                    self.oww_model = Model(inference_framework=self.inference_framework)
+                    
+            elif os.path.isfile(self.model_path):
+                # Single model file
+                self.oww_model = Model(
+                    wakeword_models=[self.model_path],
+                    inference_framework=self.inference_framework
+                )
+            else:
+                # Default: load all available pre-trained models
+                self.logger.debug("Model path not found, using default pre-trained models")
+                self.oww_model = Model(inference_framework=self.inference_framework)
             
-            self.logger.info(f"OpenWakeWord model loaded from: {self.model_path}")
+            self.logger.info(f"OpenWakeWord model loaded with {self.inference_framework} framework from: {self.model_path}")
             
         except ImportError as e:
             raise WakeWordProviderUnavailableError(

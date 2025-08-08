@@ -129,27 +129,63 @@ fi
 
 # Step 7: Download OpenWakeWord models
 print_step "Downloading OpenWakeWord models..."
-if [[ ! -d "openwakeword_models" ]]; then
-    print_status "Creating OpenWakeWord models directory..."
-    mkdir -p openwakeword_models
+if [[ ! -d "openwakeword_models" ]] || [[ $(ls -1 openwakeword_models/*.onnx 2>/dev/null | wc -l) -eq 0 ]]; then
+    print_status "Downloading OpenWakeWord models using Python utility..."
     
-    cd openwakeword_models
-    
-    # Download popular models
-    print_status "Downloading popular OpenWakeWord models..."
-    curl -LO "https://github.com/dscripka/openWakeWord/releases/download/v0.6.0/alexa_v0.1.onnx" || print_warning "Failed to download Alexa model"
-    curl -LO "https://github.com/dscripka/openWakeWord/releases/download/v0.6.0/hey_jarvis_v0.1.onnx" || print_warning "Failed to download Hey Jarvis model"  
-    curl -LO "https://github.com/dscripka/openWakeWord/releases/download/v0.6.0/hey_mycroft_v0.1.onnx" || print_warning "Failed to download Hey Mycroft model"
-    
-    cd ..
-    
-    # Check if at least one model was downloaded
-    if [[ -f "openwakeword_models/alexa_v0.1.onnx" ]] || [[ -f "openwakeword_models/hey_jarvis_v0.1.onnx" ]] || [[ -f "openwakeword_models/hey_mycroft_v0.1.onnx" ]]; then
-        print_status "OpenWakeWord models installed ✅"
-    else
-        print_warning "OpenWakeWord model download failed - wake word detection may not work"
-        print_status "You can manually download from: https://github.com/dscripka/openWakeWord/releases"
-    fi
+    # Use the official OpenWakeWord download utility (most reliable method)
+    python -c "
+import openwakeword.utils
+print('Downloading models to ./openwakeword_models directory...')
+try:
+    openwakeword.utils.download_models(target_directory='./openwakeword_models')
+    print('✅ Models downloaded successfully')
+except Exception as e:
+    print(f'❌ Error downloading to custom directory: {e}')
+    print('Trying default download location...')
+    openwakeword.utils.download_models()
+    print('✅ Models downloaded to default location')
+
+# Copy core models to OpenWakeWord package directory
+import os
+import shutil
+import openwakeword
+
+package_path = os.path.dirname(openwakeword.__file__)
+package_models_dir = os.path.join(package_path, 'resources', 'models')
+os.makedirs(package_models_dir, exist_ok=True)
+
+core_models = ['embedding_model.onnx', 'melspectrogram.onnx', 'silero_vad.onnx']
+for model in core_models:
+    local_path = f'./openwakeword_models/{model}'
+    package_path_file = os.path.join(package_models_dir, model)
+    if os.path.exists(local_path) and not os.path.exists(package_path_file):
+        shutil.copy2(local_path, package_path_file)
+        print(f'✅ Copied {model} to package directory')
+
+print('✅ Core models installed in package directory')
+" && print_status "OpenWakeWord models installed ✅" || {
+        print_warning "Python download failed, trying manual download..."
+        
+        # Fallback: manual download with correct URLs (v0.5.1)
+        mkdir -p openwakeword_models
+        cd openwakeword_models
+        
+        print_status "Downloading core models..."
+        curl -LO "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/embedding_model.onnx" || print_warning "Failed to download embedding model"
+        curl -LO "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/melspectrogram.onnx" || print_warning "Failed to download melspectrogram model"
+        curl -LO "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/alexa_v0.1.onnx" || print_warning "Failed to download Alexa model"
+        curl -LO "https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/hey_jarvis_v0.1.onnx" || print_warning "Failed to download Hey Jarvis model"
+        
+        cd ..
+        
+        # Check if core models were downloaded
+        if [[ -f "openwakeword_models/embedding_model.onnx" ]] && [[ -f "openwakeword_models/melspectrogram.onnx" ]]; then
+            print_status "OpenWakeWord core models installed ✅"
+        else
+            print_error "OpenWakeWord model download failed - wake word detection will not work"
+            print_status "Please install manually: pip install openwakeword && python -c 'import openwakeword.utils; openwakeword.utils.download_models()'"
+        fi
+    }
 else
     print_status "OpenWakeWord models already exist ✅"
 fi

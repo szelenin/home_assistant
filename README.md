@@ -170,18 +170,130 @@ Choose the wake word detection engines you want to use. The default `openwakewor
 **Documentation:** [OpenWakeWord GitHub](https://github.com/dscripka/openWakeWord) • [Model Hub](https://github.com/dscripka/openWakeWord/tree/main/openwakeword/models)  
 **Demo:** [Interactive Web Demo](https://openwakeword.com/demo/) • Test custom wake words
 
-**Installation:**
-1. **Download Models** from [OpenWakeWord Models](https://github.com/dscripka/openWakeWord/releases):
+**Prerequisites:**
 ```bash
-# Create models directory
-mkdir -p openwakeword_models
+# Install OpenWakeWord Python package (included in requirements.txt)
+pip install openwakeword
 
-# Download popular models (recommended)
-cd openwakeword_models
-curl -LO https://github.com/dscripka/openWakeWord/releases/download/v0.6.0/alexa_v0.1.onnx
-curl -LO https://github.com/dscripka/openWakeWord/releases/download/v0.6.0/hey_jarvis_v0.1.onnx
-curl -LO https://github.com/dscripka/openWakeWord/releases/download/v0.6.0/hey_mycroft_v0.1.onnx
+# For ONNX framework support (recommended)
+pip install onnxruntime
 ```
+
+**Installation:**
+1. **Download Models** (automatically using Python utility - recommended):
+```bash
+# After installing requirements.txt, download models using the official utility
+python -c "
+import openwakeword.utils
+openwakeword.utils.download_models(target_directory='./openwakeword_models')
+print('✅ Models downloaded successfully')
+
+# Copy core models to OpenWakeWord package directory (required for ONNX framework)
+import os, shutil, openwakeword
+package_path = os.path.dirname(openwakeword.__file__)
+package_models_dir = os.path.join(package_path, 'resources', 'models')
+os.makedirs(package_models_dir, exist_ok=True)
+
+core_models = ['embedding_model.onnx', 'melspectrogram.onnx', 'silero_vad.onnx']
+for model in core_models:
+    local_path = f'./openwakeword_models/{model}'
+    package_path_file = os.path.join(package_models_dir, model)
+    if os.path.exists(local_path) and not os.path.exists(package_path_file):
+        shutil.copy2(local_path, package_path_file)
+        print(f'✅ Copied {model} to package directory')
+print('✅ Core models installed in package directory')
+"
+```
+
+**Alternative: Manual Installation** (if Python utility fails):
+```bash
+# Step 1: Create models directory
+mkdir -p openwakeword_models
+cd openwakeword_models
+
+# Step 2: Download core models (required for all wake words)
+curl -LO https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/embedding_model.onnx
+curl -LO https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/melspectrogram.onnx
+curl -LO https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/silero_vad.onnx
+
+# Step 3: Download wake word models (choose what you need)
+curl -LO https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/alexa_v0.1.onnx
+curl -LO https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/hey_jarvis_v0.1.onnx
+curl -LO https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/hey_mycroft_v0.1.onnx
+curl -LO https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/timer_v0.1.onnx
+curl -LO https://github.com/dscripka/openWakeWord/releases/download/v0.5.1/weather_v0.1.onnx
+
+# Step 4: Return to project directory
+cd ..
+
+# Step 5: Copy core models to OpenWakeWord package directory (CRITICAL STEP)
+# This step is required because OpenWakeWord looks for core models in its package directory
+python -c "
+import os, shutil, openwakeword
+
+# Find OpenWakeWord package directory
+package_path = os.path.dirname(openwakeword.__file__)
+package_models_dir = os.path.join(package_path, 'resources', 'models')
+
+# Create the directory if it doesn't exist
+os.makedirs(package_models_dir, exist_ok=True)
+print(f'📁 Package models directory: {package_models_dir}')
+
+# Copy each core model
+core_models = ['embedding_model.onnx', 'melspectrogram.onnx', 'silero_vad.onnx']
+for model in core_models:
+    local_path = f'./openwakeword_models/{model}'
+    package_path_file = os.path.join(package_models_dir, model)
+    
+    if os.path.exists(local_path):
+        if not os.path.exists(package_path_file):
+            shutil.copy2(local_path, package_path_file)
+            print(f'✅ Copied {model} to package directory')
+        else:
+            print(f'ℹ️  {model} already exists in package directory')
+    else:
+        print(f'❌ {model} not found in local directory')
+
+print('✅ Core model installation complete')
+"
+
+# Step 6: Verify installation
+python -c "
+from home_assistant.wake_word.detector import WakeWordDetector
+detector = WakeWordDetector('openwakeword')
+if detector.is_available():
+    print('🎉 OpenWakeWord installation successful!')
+    info = detector.get_provider_info()
+    print(f'   Available models in {info[\"model_path\"]}')
+    detector.cleanup()
+else:
+    print('❌ OpenWakeWord installation failed')
+"
+```
+
+**Troubleshooting OpenWakeWord Installation:**
+
+If you encounter issues:
+
+1. **"Protobuf parsing failed" error**: Core models missing from package directory
+   ```bash
+   # Check if core models exist in package directory
+   python -c "
+   import openwakeword, os
+   package_dir = os.path.join(os.path.dirname(openwakeword.__file__), 'resources', 'models')
+   core_models = ['embedding_model.onnx', 'melspectrogram.onnx', 'silero_vad.onnx']
+   for model in core_models:
+       path = os.path.join(package_dir, model)
+       exists = os.path.exists(path)
+       print(f'{model}: {\"✅ Found\" if exists else \"❌ Missing\"} at {path}')
+   "
+   ```
+
+2. **"File doesn't exist" error**: Run the core model copy step again (Step 5 above)
+
+3. **"tflite runtime not found" warning**: This is normal when using ONNX framework, ignore it
+
+4. **Permission errors**: Use `sudo` for the copy command or check directory permissions
 
 2. **Configure:**
 ```yaml
@@ -421,14 +533,19 @@ chmod +x install-macos.sh
    - **Linux/macOS**: `vosk-model-en-us-0.22` (50MB, better accuracy)
 9. **Configures model path** in `config.yaml`
 
+**👂 Wake Word Detection Setup:**
+10. **Downloads OpenWakeWord models** (all wake words and core models)
+11. **Copies core models** to OpenWakeWord package directory automatically
+12. **Configures wake word detection** in `config.yaml`
+
 **🔧 Configuration:**
-10. **Creates AI configuration template** (`ai_config.yaml`)
-11. **Sets up audio permissions** (Linux/Pi: adds user to audio group)
-12. **Configures ALSA** (Raspberry Pi specific)
+13. **Creates AI configuration template** (`ai_config.yaml`)
+14. **Sets up audio permissions** (Linux/Pi: adds user to audio group)
+15. **Configures ALSA** (Raspberry Pi specific)
 
 **✅ Verification:**
-13. **Runs system tests** to verify installation
-14. **Displays next steps** with API key setup instructions
+16. **Runs system tests** to verify installation
+17. **Displays next steps** with API key setup instructions
 
 #### Installation Output:
 The script provides colored output showing progress:
