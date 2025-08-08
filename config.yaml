@@ -10,7 +10,7 @@ speech:
   providers:
     vosk:
       model_path: "./vosk-model-small-en-us-0.15"
-      confidence_threshold: 0.8
+      confidence_threshold: 0.0
       sample_rate: 16000
     google:
       show_all: false

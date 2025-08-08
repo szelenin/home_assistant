@@ -248,27 +248,158 @@ tts:
 
 **Browse all available models**: [Piper Voice Samples](https://rhasspy.github.io/piper-samples/)
 
-### Installation
+### Quick Installation
 
-1. Clone the repository:
+**🚀 One-Command Installation (Recommended):**
+
+Run the appropriate command for your operating system:
+
+**macOS:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/szelenin/home_assistant/main/install-macos.sh | bash
+```
+
+**Linux/Raspberry Pi:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/szelenin/home_assistant/main/install-linux.sh | bash
+```
+
+**Alternative - Download and Run Locally:**
+```bash
+# Download the script first (safer approach)
+curl -fsSL https://raw.githubusercontent.com/szelenin/home_assistant/main/install-macos.sh > install-macos.sh
+# or
+curl -fsSL https://raw.githubusercontent.com/szelenin/home_assistant/main/install-linux.sh > install-linux.sh
+
+# Review the script (optional but recommended)
+less install-macos.sh  # or install-linux.sh
+
+# Make executable and run
+chmod +x install-macos.sh
+./install-macos.sh
+```
+
+#### What the Installation Script Does:
+
+**🔍 System Check:**
+1. **Detects operating system** (macOS, Ubuntu, Debian, Fedora, Arch, Raspberry Pi OS)
+2. **Validates Python 3.8+** installation
+3. **Checks for required tools** (git, curl, unzip)
+
+**📦 System Dependencies:**
+4. **Installs system packages:**
+   - **PortAudio** (required for speech recognition)
+   - **Development tools** (build-essential, python3-dev)
+   - **Audio libraries** (ALSA on Linux)
+   - **Homebrew** (macOS, if not installed)
+
+**🏠 Project Setup:**
+5. **Clones Home Assistant repository** (if not already present)
+6. **Creates Python virtual environment** (`venv/`)
+7. **Installs Python dependencies** from `requirements.txt`
+
+**🎤 Speech Recognition Setup:**
+8. **Downloads optimized Vosk model:**
+   - **Raspberry Pi**: `vosk-model-small-en-us-0.15` (40MB, fast)
+   - **Linux/macOS**: `vosk-model-en-us-0.22` (50MB, better accuracy)
+9. **Configures model path** in `config.yaml`
+
+**🔧 Configuration:**
+10. **Creates AI configuration template** (`ai_config.yaml`)
+11. **Sets up audio permissions** (Linux/Pi: adds user to audio group)
+12. **Configures ALSA** (Raspberry Pi specific)
+
+**✅ Verification:**
+13. **Runs system tests** to verify installation
+14. **Displays next steps** with API key setup instructions
+
+#### Installation Output:
+The script provides colored output showing progress:
+- 🔵 **[STEP]** - Major installation phases
+- 🟢 **[INFO]** - Successful operations  
+- 🟡 **[WARNING]** - Non-critical issues
+- 🔴 **[ERROR]** - Critical failures
+
+#### Common Installation Issues:
+
+**🔴 "Python 3.8+ required" error:**
+- **macOS**: Install from [python.org](https://www.python.org/downloads/) or `brew install python3`
+- **Linux**: `sudo apt update && sudo apt install python3 python3-venv python3-pip`
+
+**🔴 "PortAudio not found" error:**
+- **macOS**: `brew install portaudio`  
+- **Ubuntu/Debian**: `sudo apt install portaudio19-dev python3-pyaudio`
+- **Raspberry Pi**: Reboot may be required after installation
+
+**🔴 "Permission denied" for microphone:**
+- **macOS**: System Preferences → Security & Privacy → Privacy → Microphone
+- **Linux**: Ensure user is in `audio` group: `sudo usermod -a -G audio $USER`
+
+**🔴 Vosk model download fails:**
+- Manual download: [Vosk Models](https://alphacephei.com/vosk/models)
+- Extract to project directory and update `config.yaml`
+
+**🔴 "No module named 'home_assistant'" error:**
+- Ensure virtual environment is activated: `source venv/bin/activate`
+- Check you're in the correct directory with `main.py` and `config.yaml`
+
+#### After Installation:
+1. **Add AI API keys** to `ai_config.yaml`:
+   - [Get Anthropic Claude key](https://console.anthropic.com/settings/keys) (recommended)
+   - [Get OpenAI ChatGPT key](https://platform.openai.com/api-keys) (alternative)
+
+2. **Grant microphone permissions** (macOS):
+   - System Preferences → Security & Privacy → Privacy → Microphone
+   - Enable access for Terminal/your IDE
+
+3. **Run the application:**
    ```bash
-   git clone git@github.com:szelenin/home_assistant.git
+   source venv/bin/activate
+   python main.py
+   ```
+
+### Manual Installation
+
+If you prefer to install manually or need custom configuration:
+
+#### Prerequisites
+Ensure you have the required system dependencies installed first (see [System Dependencies](#system-dependencies) section above).
+
+#### Installation Steps
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/szelenin/home_assistant.git
    cd home_assistant
    ```
 
-2. Create and activate virtual environment:
+2. **Create and activate virtual environment:**
    ```bash
    python3 -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-3. Install Python dependencies:
+3. **Install Python dependencies:**
    ```bash
    # Install all dependencies (includes TTS providers and speech recognition engines)
    pip install -r requirements.txt
    ```
 
-4. Configure AI Provider (Required):
+4. **Download Vosk speech recognition model:**
+   ```bash
+   # For Raspberry Pi (small model, 40MB):
+   curl -LO https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+   unzip vosk-model-small-en-us-0.15.zip
+   
+   # For desktop/server (medium model, 50MB):
+   curl -LO https://alphacephei.com/vosk/models/vosk-model-en-us-0.22.zip
+   unzip vosk-model-en-us-0.22.zip
+   
+   # Update config.yaml with correct model path:
+   # Edit the 'model_path' setting to point to your downloaded model
+   ```
+
+5. **Configure AI Provider (Required):**
    
    The system uses AI providers for natural language understanding. You need at least one API key:
 
@@ -308,7 +439,23 @@ tts:
    nano config.yaml
    ```
 
-6. Run the application:
+6. **Test the installation:**
+   ```bash
+   # Test speech recognition providers
+   python tests/integration/test_recognizer.py
+   
+   # Test TTS providers  
+   python tests/integration/test_tts.py
+   
+   # Quick system check
+   python -c "
+   from home_assistant.speech.recognizer import SpeechRecognizer
+   recognizer = SpeechRecognizer()
+   print('Available providers:', recognizer.get_available_providers())
+   "
+   ```
+
+7. **Run the application:**
    ```bash
    python main.py
    ```
