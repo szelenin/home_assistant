@@ -18,6 +18,11 @@ vosk>=0.3.45          # For Vosk offline speech recognition (default provider)
 openai-whisper>=20231117  # For OpenAI Whisper speech recognition
 # SpeechRecognition>=3.10.0 already included above for Google provider
 
+# Wake Word Detection Provider dependencies
+openwakeword>=0.6.0          # For OpenWakeWord detection (default provider)
+pvporcupine>=3.0.0          # For Picovoice Porcupine wake word detection
+pocketsphinx>=5.0.0         # For PocketSphinx keyword spotting
+
 # Optional dependencies for advanced speech recognition
 # google-cloud-speech  # For Google Cloud Speech-to-Text API
 # pocketsphinx>=0.1.15 # For CMU Sphinx offline recognition (legacy)

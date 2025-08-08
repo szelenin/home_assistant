@@ -1,13 +1,13 @@
 # Home Assistant
 
-A Python-based voice-controlled home automation system with speech recognition and text-to-speech capabilities.
+A Python-based voice-controlled home automation system with wake word detection, speech recognition, and text-to-speech capabilities.
 
 ## Features
 
 - **Voice Control**: Speech recognition for hands-free operation
 - **Multi-Provider Text-to-Speech**: Support for pyttsx3, eSpeak-NG, and Piper neural TTS with configurable providers
 - **Multi-Provider Speech Recognition**: Support for Vosk (offline), Google (online), and OpenAI Whisper (offline) with configurable providers
-- **Wake Word Detection**: Customizable wake word for activation
+- **Multi-Provider Wake Word Detection**: Support for OpenWakeWord (offline custom), Porcupine (commercial), and PocketSphinx (basic free) with configurable providers
 - **AI Integration**: Claude (Anthropic) and ChatGPT (OpenAI) support with automatic fallback
 - **Intent Recognition**: Understands weather, device control, personal info, and general questions
 - **Natural Language Processing**: Translates commands to device API calls
@@ -160,6 +160,123 @@ speech:
 - **RAM**: 4GB+ (8GB+ for medium/large models)
 - **GPU**: CUDA-compatible GPU optional but provides 5-10x speedup
 - **Disk**: 40MB-1.5GB depending on model
+
+#### Wake Word Detection Engine Dependencies (Optional)
+
+Choose the wake word detection engines you want to use. The default `openwakeword` provider offers excellent custom wake word support with offline operation.
+
+##### OpenWakeWord (Default)
+**Description:** Free offline wake word detection with custom word support  
+**Documentation:** [OpenWakeWord GitHub](https://github.com/dscripka/openWakeWord) • [Model Hub](https://github.com/dscripka/openWakeWord/tree/main/openwakeword/models)  
+**Demo:** [Interactive Web Demo](https://openwakeword.com/demo/) • Test custom wake words
+
+**Installation:**
+1. **Download Models** from [OpenWakeWord Models](https://github.com/dscripka/openWakeWord/releases):
+```bash
+# Create models directory
+mkdir -p openwakeword_models
+
+# Download popular models (recommended)
+cd openwakeword_models
+curl -LO https://github.com/dscripka/openWakeWord/releases/download/v0.6.0/alexa_v0.1.onnx
+curl -LO https://github.com/dscripka/openWakeWord/releases/download/v0.6.0/hey_jarvis_v0.1.onnx
+curl -LO https://github.com/dscripka/openWakeWord/releases/download/v0.6.0/hey_mycroft_v0.1.onnx
+```
+
+2. **Configure:**
+```yaml
+wake_word:
+  name: "TestAssistant"  # Your assistant's name
+  detection:
+    provider: openwakeword
+    providers:
+      openwakeword:
+        model_path: "./openwakeword_models"
+        threshold: 0.5        # 0.0-1.0 detection sensitivity
+        inference_framework: "onnx"  # onnx or tflite
+```
+
+**Available Models:**
+- **Alexa** - Amazon's wake word
+- **Hey Jarvis** - Iron Man inspired
+- **Hey Mycroft** - Open source assistant  
+- **Computer** - Star Trek inspired
+- **Custom Models** - Train your own with OpenWakeWord toolkit
+
+**Model Performance:**
+- **Accuracy**: 85-95% (varies by model and environment)
+- **Latency**: 100-300ms detection time
+- **Resource Usage**: Medium (40-200MB models, moderate CPU)
+- **Custom Training**: Supported with toolkit
+
+##### Picovoice Porcupine (Commercial)
+**Description:** High-accuracy commercial wake word detection with very low latency  
+**Documentation:** [Porcupine Docs](https://picovoice.ai/docs/porcupine/) • [Console](https://console.picovoice.ai/)  
+**Demo:** [Interactive Demo](https://picovoice.ai/demos/) • Test built-in keywords
+
+**Installation:**
+1. **Get Access Key** from [Picovoice Console](https://console.picovoice.ai/):
+   - Sign up for free account
+   - Create a new access key
+   - Note: Free tier has usage limits
+
+2. **Configure:**
+```yaml
+wake_word:
+  detection:
+    provider: porcupine
+    providers:
+      porcupine:
+        access_key: "your-picovoice-key-here"  # From console
+        keyword_path: null  # Use built-in keywords or custom .ppn file
+```
+
+**Built-in Keywords:** Alexa, Computer, Jarvis, Smart Mirror, Hey Google, Hey Siri, Bumblebee, Grasshopper, Picovoice, Terminator
+
+**Features:**
+- **Accuracy**: 95%+ with optimized models
+- **Latency**: ~30ms (very low)
+- **Resource Usage**: Very low (optimized for edge devices)
+- **Custom Keywords**: Available with subscription
+- **Commercial License**: Required for commercial use
+
+##### PocketSphinx (Free/Basic)
+**Description:** Free offline keyword spotting using CMU Sphinx  
+**Documentation:** [PocketSphinx](https://github.com/cmusphinx/pocketsphinx) • [CMU Sphinx](https://cmusphinx.github.io/)
+
+**Installation:** Included with requirements.txt (`pocketsphinx` package)
+
+**Configuration:**
+```yaml
+wake_word:
+  detection:
+    provider: pocketsphinx
+    providers:
+      pocketsphinx:
+        hmm_path: null              # Acoustic model (uses default)
+        dict_path: null             # Dictionary (uses default)
+        keyphrase_threshold: 1e-20  # Detection sensitivity
+```
+
+**Features:**
+- **Accuracy**: 70-85% (depends on conditions and tuning)
+- **Latency**: 200-500ms
+- **Resource Usage**: Low-medium
+- **Custom Keywords**: Any phrase supported
+- **Licensing**: BSD (completely free)
+
+#### Quick Comparison - Wake Word Detection
+
+| Provider | Type | Accuracy | Latency | Resource Usage | Custom Words | Cost |
+|----------|------|----------|---------|----------------|--------------|------|
+| **OpenWakeWord** | Offline | 85-95% | 100-300ms | Medium | ✅ Toolkit | Free |
+| **Porcupine** | Offline | 95%+ | ~30ms | Very Low | ✅ Paid | Freemium |  
+| **PocketSphinx** | Offline | 70-85% | 200-500ms | Low-Medium | ✅ Any phrase | Free |
+
+**Recommendations:**
+- **Privacy/Custom**: OpenWakeWord (default)
+- **Best Performance**: Porcupine (commercial)
+- **Basic/Free**: PocketSphinx (simple setup)
 
 #### TTS Engine Dependencies (Optional)
 
@@ -910,6 +1027,80 @@ print('Testing provider:', recognizer.provider_name)
 print('Is available:', recognizer.is_available())
 success, text = recognizer.listen_for_speech(timeout=5)
 print('Result:', success, text)
+"
+```
+
+### Wake Word Detection Issues
+
+#### General Wake Word Detection Issues
+- **"Wake word detector not available"**: Check system dependencies and model installations
+- **Wake word not detected**: Check microphone permissions, audio levels, and background noise
+- **False wake word detections**: Adjust detection threshold or try different model
+- **High CPU usage**: Use more efficient models or adjust processing parameters
+
+#### OpenWakeWord Issues
+- **"OpenWakeWord library not available"**: Install with `pip install openwakeword`
+- **"No .onnx model files found"**: Download models from [OpenWakeWord Releases](https://github.com/dscripka/openWakeWord/releases)
+  1. Create `openwakeword_models` directory
+  2. Download `.onnx` model files
+  3. Update `model_path` in config.yaml
+- **Model loading slow**: Large models take time to load initially
+- **Detection accuracy low**: Try adjusting threshold or using different model
+- **Memory usage high**: Use smaller/optimized models for your platform
+
+#### Porcupine Issues
+- **"Invalid access key"**: Get valid key from [Picovoice Console](https://console.picovoice.ai/)
+- **"Porcupine library not available"**: Install with `pip install pvporcupine`
+- **Wake word not supported**: Check [built-in keywords](https://picovoice.ai/docs/porcupine/#built-in-keywords) or create custom .ppn file
+- **Usage limit exceeded**: Check your Picovoice account usage and plan limits
+- **Commercial license required**: Upgrade plan for commercial use
+
+#### PocketSphinx Issues
+- **"PocketSphinx library not available"**: Install with `pip install pocketsphinx`
+- **Poor detection accuracy**: 
+  - Adjust `keyphrase_threshold` (try 1e-15 to 1e-25)
+  - Use shorter, clearer wake phrases
+  - Improve microphone quality and reduce background noise
+- **High false positive rate**: Increase threshold value (less sensitive)
+- **High false negative rate**: Decrease threshold value (more sensitive)
+- **Model loading errors**: Check HMM and dictionary paths, use defaults if custom paths fail
+
+#### Debugging Wake Word Detection Issues
+```bash
+# Check wake word provider availability
+source venv/bin/activate
+python -c "
+from home_assistant.wake_word.detector import WakeWordDetector
+detector = WakeWordDetector()
+print('Available providers:', detector.get_available_providers())
+for name, available in detector.get_available_providers().items():
+    if available:
+        provider_detector = WakeWordDetector(name)
+        print(f'{name} info:', provider_detector.get_provider_info())
+"
+
+# Test specific provider with verbose logging
+python -c "
+import logging
+logging.basicConfig(level=logging.DEBUG)
+from home_assistant.wake_word.detector import WakeWordDetector
+detector = WakeWordDetector('openwakeword')  # or 'porcupine', 'pocketsphinx'
+print('Testing provider:', detector.provider_name)
+print('Is available:', detector.is_available())
+detected, confidence = detector.listen_for_wake_word('test wake word', timeout=5)
+print('Result:', detected, confidence)
+"
+
+# Check microphone and audio permissions
+python -c "
+import pyaudio
+audio = pyaudio.PyAudio()
+print('Audio devices:')
+for i in range(audio.get_device_count()):
+    info = audio.get_device_info_by_index(i)
+    if info['maxInputChannels'] > 0:
+        print(f'  {i}: {info[\"name\"]} (inputs: {info[\"maxInputChannels\"]})')
+audio.terminate()
 "
 ```
 

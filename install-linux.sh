@@ -193,7 +193,34 @@ else
     print_status "Vosk model already exists ✅"
 fi
 
-# Step 7: Setup AI configuration
+# Step 7: Download OpenWakeWord models
+print_step "Downloading OpenWakeWord models..."
+if [[ ! -d "openwakeword_models" ]]; then
+    print_status "Creating OpenWakeWord models directory..."
+    mkdir -p openwakeword_models
+    
+    cd openwakeword_models
+    
+    # Download popular models
+    print_status "Downloading popular OpenWakeWord models..."
+    curl -LO "https://github.com/dscripka/openWakeWord/releases/download/v0.6.0/alexa_v0.1.onnx" || print_warning "Failed to download Alexa model"
+    curl -LO "https://github.com/dscripka/openWakeWord/releases/download/v0.6.0/hey_jarvis_v0.1.onnx" || print_warning "Failed to download Hey Jarvis model"  
+    curl -LO "https://github.com/dscripka/openWakeWord/releases/download/v0.6.0/hey_mycroft_v0.1.onnx" || print_warning "Failed to download Hey Mycroft model"
+    
+    cd ..
+    
+    # Check if at least one model was downloaded
+    if [[ -f "openwakeword_models/alexa_v0.1.onnx" ]] || [[ -f "openwakeword_models/hey_jarvis_v0.1.onnx" ]] || [[ -f "openwakeword_models/hey_mycroft_v0.1.onnx" ]]; then
+        print_status "OpenWakeWord models installed ✅"
+    else
+        print_warning "OpenWakeWord model download failed - wake word detection may not work"
+        print_status "You can manually download from: https://github.com/dscripka/openWakeWord/releases"
+    fi
+else
+    print_status "OpenWakeWord models already exist ✅"
+fi
+
+# Step 8: Setup AI configuration
 print_step "Setting up AI configuration..."
 if [[ ! -f "ai_config.yaml" ]]; then
     if [[ -f "ai_config.example.yaml" ]]; then
@@ -229,7 +256,7 @@ else
     print_status "AI config already exists ✅"
 fi
 
-# Step 8: Setup audio permissions (Raspberry Pi specific)
+# Step 9: Setup audio permissions (Raspberry Pi specific)
 if [[ $IS_RPI == true ]]; then
     print_step "🍓 Configuring Raspberry Pi audio settings..."
     
@@ -251,7 +278,7 @@ EOF
     fi
 fi
 
-# Step 9: Run basic test
+# Step 10: Run basic test
 print_step "Running basic system test..."
 print_status "Testing speech recognition providers..."
 python -c "
@@ -262,7 +289,7 @@ print('✅ Available speech providers:', providers)
 print('✅ System test completed successfully!')
 " && print_status "System test passed ✅" || print_warning "System test had issues, but installation may still work"
 
-# Step 10: Final instructions
+# Step 11: Final instructions
 print_step "🎉 Installation Complete!"
 echo
 print_status "Next steps:"

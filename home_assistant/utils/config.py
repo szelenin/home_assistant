@@ -28,7 +28,26 @@ class ConfigManager:
         default_config = {
             'wake_word': {
                 'name': None,
-                'sensitivity': 0.5
+                'sensitivity': 0.5,
+                'detection': {
+                    'provider': 'openwakeword',  # Options: openwakeword, porcupine, pocketsphinx
+                    'providers': {
+                        'openwakeword': {
+                            'model_path': './openwakeword_models',
+                            'threshold': 0.5,
+                            'inference_framework': 'onnx'
+                        },
+                        'porcupine': {
+                            'access_key': 'your-picovoice-key-here',
+                            'keyword_path': None
+                        },
+                        'pocketsphinx': {
+                            'hmm_path': None,
+                            'dict_path': None,
+                            'keyphrase_threshold': 1e-20
+                        }
+                    }
+                }
             },
             'speech': {
                 'provider': 'vosk',
@@ -52,6 +71,25 @@ class ConfigManager:
             self._config['wake_word'] = {}
         
         self._config['wake_word']['name'] = name
+        self.save_config(self._config)
+    
+    def get_wake_word_detection_config(self) -> Dict[str, Any]:
+        """Get the wake word detection configuration."""
+        return self._config.get('wake_word', {}).get('detection', {})
+    
+    def get_wake_word_provider(self) -> str:
+        """Get the configured wake word detection provider."""
+        detection_config = self.get_wake_word_detection_config()
+        return detection_config.get('provider', 'openwakeword')
+    
+    def set_wake_word_provider(self, provider: str):
+        """Set the wake word detection provider and save to config."""
+        if 'wake_word' not in self._config:
+            self._config['wake_word'] = {}
+        if 'detection' not in self._config['wake_word']:
+            self._config['wake_word']['detection'] = {}
+        
+        self._config['wake_word']['detection']['provider'] = provider
         self.save_config(self._config)
     
     def get_config(self) -> Dict[str, Any]:

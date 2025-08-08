@@ -40,3 +40,17 @@ tts:
 wake_word:
   name: TestAssistant
   sensitivity: 0.5
+  detection:
+    provider: openwakeword  # Options: openwakeword, porcupine, pocketsphinx
+    providers:
+      openwakeword:
+        model_path: "./openwakeword_models"
+        threshold: 0.5
+        inference_framework: "onnx"
+      porcupine:
+        access_key: "your-picovoice-key-here"
+        keyword_path: null
+      pocketsphinx:
+        hmm_path: null
+        dict_path: null
+        keyphrase_threshold: 1e-20
