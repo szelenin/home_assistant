@@ -44,8 +44,11 @@ class WakeWordDetectorIntegrationTests(unittest.TestCase):
         is_available = detector.is_available()
         self.assertIsInstance(is_available, bool)
         
+        # Test should fail if provider is not available (following speech recognition pattern)
         if not is_available:
-            print("ℹ️  OpenWakeWord not available - likely missing models or dependencies")
+            self.fail("OpenWakeWord provider should be available after initialization. "
+                     "Missing models or dependencies. Install with: pip install openwakeword "
+                     "and download models from https://github.com/dscripka/openWakeWord/releases")
         else:
             print("✅ OpenWakeWord provider available")
         
@@ -121,8 +124,11 @@ class WakeWordDetectorIntegrationTests(unittest.TestCase):
         is_available = detector.is_available()
         self.assertIsInstance(is_available, bool)
         
+        # Test should fail if provider is not available (following speech recognition pattern)
         if not is_available:
-            print("ℹ️  Porcupine not available - likely missing access key or dependencies")
+            self.fail("Porcupine provider should be available after initialization. "
+                     "Missing access key or dependencies. Install with: pip install pvporcupine "
+                     "and get access key from https://console.picovoice.ai/")
         else:
             print("✅ Porcupine provider available")
         
@@ -179,8 +185,10 @@ class WakeWordDetectorIntegrationTests(unittest.TestCase):
         is_available = detector.is_available()
         self.assertIsInstance(is_available, bool)
         
+        # Test should fail if provider is not available (following speech recognition pattern)
         if not is_available:
-            print("ℹ️  PocketSphinx not available - likely missing models or dependencies")
+            self.fail("PocketSphinx provider should be available after initialization. "
+                     "Missing dependencies. Install with: pip install pocketsphinx")
         else:
             print("✅ PocketSphinx provider available")
         
