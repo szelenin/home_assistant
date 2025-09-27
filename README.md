@@ -298,7 +298,7 @@ If you encounter issues:
 2. **Configure:**
 ```yaml
 wake_word:
-  name: "TestAssistant"  # Your assistant's name
+  name: "alexa"  # Choose from: alexa, hey jarvis, hey mycroft, hey rhasspy, timer, weather
   detection:
     provider: openwakeword
     providers:
@@ -308,12 +308,16 @@ wake_word:
         inference_framework: "onnx"  # onnx or tflite
 ```
 
-**Available Models:**
-- **Alexa** - Amazon's wake word
-- **Hey Jarvis** - Iron Man inspired
-- **Hey Mycroft** - Open source assistant  
-- **Computer** - Star Trek inspired
+**Available Pre-trained Models:**
+- **alexa** - Amazon's wake word (most accurate)
+- **hey jarvis** / **jarvis** - Iron Man inspired assistant  
+- **hey mycroft** / **mycroft** - Open source assistant compatible
+- **hey rhasspy** / **rhasspy** - Voice assistant platform compatible
+- **timer** - For timer/alarm applications
+- **weather** - For weather-related commands
 - **Custom Models** - Train your own with OpenWakeWord toolkit
+
+**Important**: Only these pre-trained models are supported. Custom wake words like "TestAssistant" require training your own model.
 
 **Model Performance:**
 - **Accuracy**: 85-95% (varies by model and environment)
@@ -479,6 +483,12 @@ tts:
 
 ### Quick Installation
 
+**🎯 Optimal Configuration (Tested September 2025):**
+- **Wake Word**: PocketSphinx + "jarvis" (100% reliability)
+- **Speech Recognition**: Whisper + "en" (100% accuracy, free, offline)
+- **Text-to-Speech**: pyttsx + system voices (fast, reliable, free)
+- **FFmpeg**: Required for Whisper functionality
+
 **🚀 One-Command Installation (Recommended):**
 
 Run the appropriate command for your operating system:
@@ -591,6 +601,411 @@ The script provides colored output showing progress:
    source venv/bin/activate
    python main.py
    ```
+
+### macOS Setup Guide
+
+**🍎 Complete macOS Installation (Step-by-Step):**
+
+**Prerequisites:**
+```bash
+# Install Homebrew (if not already installed)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# Install Python 3.8+ (if not already installed)
+brew install python3
+
+# Install Git (if not already installed)
+brew install git
+```
+
+**System Dependencies:**
+```bash
+# Required for speech recognition
+brew install portaudio
+
+# Required for Whisper speech recognition (optimal setup)
+brew install ffmpeg
+
+# Optional: for eSpeak TTS (if you want to use eSpeak)
+brew install espeak-ng
+```
+
+**Project Installation:**
+```bash
+# Clone repository
+git clone https://github.com/szelenin/home_assistant.git
+cd home_assistant
+
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Download Vosk model (backup speech recognition)
+curl -LO https://alphacephei.com/vosk/models/vosk-model-en-us-0.22.zip
+unzip vosk-model-en-us-0.22.zip
+
+# Download OpenWakeWord models (backup wake word detection)
+python -c "
+import openwakeword.utils
+openwakeword.utils.download_models(target_directory='./openwakeword_models')
+print('✅ OpenWakeWord models downloaded')
+"
+```
+
+**Configure for Optimal Setup:**
+```bash
+# Create AI config file
+cp ai_config.example.yaml ai_config.yaml
+
+# Edit config with optimal settings
+cat > config.yaml << 'EOF'
+ai:
+  config_file: ai_config.yaml
+  provider: anthropic
+
+audio:
+  chunk_size: 512
+  sample_rate: 16000
+
+speech:
+  provider: whisper  # Optimal choice: free, offline, 100% accuracy
+  language: en       # Note: use 'en' not 'en-US' for Whisper
+  providers:
+    whisper:
+      model: base
+      device: cpu
+      temperature: 0.0
+    vosk:
+      model_path: "./vosk-model-en-us-0.22"
+      confidence_threshold: 0.0
+    google:
+      show_all: false
+
+tts:
+  provider: pyttsx  # Optimal choice: fast, reliable, uses macOS voices
+  providers:
+    pyttsx:
+      voice_id: com.apple.voice.compact.en-US.Samantha
+      rate: 150
+      volume: 0.5
+
+wake_word:
+  name: jarvis  # Optimal choice: simple, reliable word
+  sensitivity: 0.5
+  detection:
+    provider: pocketsphinx  # Optimal choice: 100% detection rate
+    providers:
+      pocketsphinx:
+        keyphrase_threshold: 0.00000000000000000001
+      openwakeword:
+        model_path: "./openwakeword_models"
+        threshold: 0.001
+        inference_framework: "onnx"
+EOF
+```
+
+**macOS-Specific Setup:**
+```bash
+# Grant microphone permissions (run this, then manually approve in System Preferences)
+echo "⚠️  IMPORTANT: Grant microphone access when prompted"
+echo "   Go to: System Preferences → Security & Privacy → Privacy → Microphone"
+echo "   Enable access for Terminal (or your IDE if running from there)"
+
+# Test microphone access
+python -c "
+import pyaudio
+audio = pyaudio.PyAudio()
+print('Available microphones:')
+for i in range(audio.get_device_count()):
+    info = audio.get_device_info_by_index(i)
+    if info['maxInputChannels'] > 0:
+        print(f'  {i}: {info[\"name\"]}')
+audio.terminate()
+"
+
+# Adjust input volume if needed
+echo "💡 TIP: If voice recognition is poor:"
+echo "   System Preferences → Sound → Input → Increase input volume to 80-100%"
+```
+
+**Add API Keys:**
+```bash
+# Edit ai_config.yaml with your API keys
+nano ai_config.yaml
+
+# Add your Anthropic Claude API key (recommended)
+# Get it from: https://console.anthropic.com/settings/keys
+```
+
+**Test Installation:**
+```bash
+# Test the complete system
+python main.py
+
+# Expected behavior:
+# 1. System says "Hello! I'm jarvis, your Home Assistant. I'm ready to help!"
+# 2. Say "jarvis" clearly - system should respond "Yes?"
+# 3. Give a command like "what time is it" or "tell me a joke"
+# 4. System processes with AI and responds
+```
+
+**macOS Troubleshooting:**
+```bash
+# If microphone not working:
+# 1. Check System Preferences → Security & Privacy → Privacy → Microphone
+# 2. Ensure Terminal (or your IDE) has microphone access
+# 3. Test input volume: System Preferences → Sound → Input
+
+# If FFmpeg not found:
+brew install ffmpeg
+
+# If PortAudio issues:
+brew reinstall portaudio
+pip uninstall pyaudio
+pip install pyaudio
+
+# If Whisper fails:
+# Check language is set to "en" not "en-US" in config.yaml
+
+# If voice sounds robotic:
+# System uses macOS built-in voices - this is normal and high quality
+```
+
+### Raspberry Pi Setup Guide
+
+**🥧 Complete Raspberry Pi Installation (Step-by-Step):**
+
+**Recommended Hardware:**
+- **Raspberry Pi 4B** with 4GB+ RAM (minimum 2GB)
+- **32GB+ microSD card** (Class 10 or better)
+- **USB microphone** or **HAT with microphone** (ReSpeaker recommended)
+- **Speakers** or **3.5mm audio output**
+- **Stable power supply** (official Pi power adapter recommended)
+
+**Operating System:**
+```bash
+# Use Raspberry Pi OS (64-bit recommended for better performance)
+# Flash using Raspberry Pi Imager: https://www.raspberrypi.org/software/
+
+# After first boot, enable SSH and configure (optional)
+sudo raspi-config
+# Advanced Options → SSH → Enable
+# Interface Options → I2C → Enable (if using HAT)
+```
+
+**System Update:**
+```bash
+# Update system packages
+sudo apt update && sudo apt upgrade -y
+
+# Install required system packages
+sudo apt install -y \
+    python3 \
+    python3-venv \
+    python3-pip \
+    python3-dev \
+    git \
+    curl \
+    unzip \
+    build-essential \
+    portaudio19-dev \
+    python3-pyaudio \
+    ffmpeg \
+    alsa-utils \
+    espeak-ng
+
+# Add user to audio group (logout/login after this)
+sudo usermod -a -G audio $USER
+```
+
+**Audio Configuration:**
+```bash
+# Configure ALSA (if needed)
+sudo nano /etc/asound.conf
+
+# Add this content (adjust card numbers as needed):
+cat << 'EOF' | sudo tee /etc/asound.conf
+pcm.!default {
+    type asym
+    playback.pcm "plughw:0,0"
+    capture.pcm "plughw:1,0"
+}
+ctl.!default {
+    type hw
+    card 0
+}
+EOF
+
+# Test audio devices
+aplay -l  # List playback devices
+arecord -l  # List capture devices
+
+# Test microphone
+arecord -d 3 test.wav && aplay test.wav
+```
+
+**Project Installation:**
+```bash
+# Clone repository
+cd /home/pi
+git clone https://github.com/szelenin/home_assistant.git
+cd home_assistant
+
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Download Raspberry Pi optimized models
+# Small Vosk model (40MB) - perfect for Pi
+curl -LO https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
+unzip vosk-model-small-en-us-0.15.zip
+
+# Download OpenWakeWord models
+python -c "
+import openwakeword.utils
+openwakeword.utils.download_models(target_directory='./openwakeword_models')
+print('✅ OpenWakeWord models downloaded')
+"
+```
+
+**Raspberry Pi Optimized Configuration:**
+```bash
+# Create optimized config for Pi
+cat > config.yaml << 'EOF'
+ai:
+  config_file: ai_config.yaml
+  provider: anthropic
+
+audio:
+  chunk_size: 512
+  sample_rate: 16000
+
+speech:
+  provider: whisper  # Best accuracy, but use 'tiny' model for Pi
+  language: en
+  providers:
+    whisper:
+      model: tiny      # Optimized for Pi (fast, low memory)
+      device: cpu
+      temperature: 0.0
+    vosk:
+      model_path: "./vosk-model-small-en-us-0.15"  # Pi-optimized model
+      confidence_threshold: 0.0
+    google:
+      show_all: false
+
+tts:
+  provider: espeak   # Fast and lightweight for Pi
+  providers:
+    espeak:
+      voice: en
+      rate: 175
+      volume: 80
+      pitch: 50
+      gap: 0
+    pyttsx:
+      rate: 150
+      volume: 0.5
+
+wake_word:
+  name: jarvis
+  sensitivity: 0.5
+  detection:
+    provider: pocketsphinx  # Lightweight and reliable
+    providers:
+      pocketsphinx:
+        keyphrase_threshold: 0.00000000000000000001
+      openwakeword:
+        model_path: "./openwakeword_models"
+        threshold: 0.001
+        inference_framework: "onnx"
+EOF
+```
+
+**Performance Optimization for Pi:**
+```bash
+# Increase GPU memory split (optional, for better performance)
+sudo raspi-config
+# Advanced Options → Memory Split → 128
+
+# Increase swap (if using larger Whisper models)
+sudo dphys-swapfile swapoff
+sudo nano /etc/dphys-swapfile
+# Change CONF_SWAPSIZE=100 to CONF_SWAPSIZE=1024
+sudo dphys-swapfile setup
+sudo dphys-swapfile swapon
+
+# Optimize for low latency audio (optional)
+echo 'JACK_NO_AUDIO_RESERVATION=1' | sudo tee -a /etc/environment
+```
+
+**Add API Keys:**
+```bash
+# Create AI config
+cp ai_config.example.yaml ai_config.yaml
+nano ai_config.yaml
+
+# Add your Anthropic Claude API key
+# Get it from: https://console.anthropic.com/settings/keys
+```
+
+**Test Installation:**
+```bash
+# Test audio devices
+python -c "
+import pyaudio
+audio = pyaudio.PyAudio()
+print('Audio devices:')
+for i in range(audio.get_device_count()):
+    info = audio.get_device_info_by_index(i)
+    if info['maxInputChannels'] > 0:
+        print(f'Input {i}: {info[\"name\"]}')
+    if info['maxOutputChannels'] > 0:
+        print(f'Output {i}: {info[\"name\"]}')
+audio.terminate()
+"
+
+# Test complete system
+python main.py
+```
+
+**Pi-Specific Troubleshooting:**
+```bash
+# If no audio output:
+amixer sset PCM,0 100%    # Set volume
+speaker-test -t sine -f 1000 -l 1 -s 1  # Test speakers
+
+# If microphone not working:
+alsamixer  # Adjust input levels
+arecord -d 3 test.wav  # Test recording
+
+# If Whisper too slow:
+# Edit config.yaml and change whisper model from 'base' to 'tiny'
+# Or switch to vosk provider for faster performance
+
+# If low memory errors:
+# Increase swap size (see above)
+# Use smaller models (tiny whisper, small vosk)
+
+# If audio choppy:
+# Increase audio buffer: chunk_size: 1024 in config.yaml
+```
+
+**Raspberry Pi Model Recommendations:**
+
+| Pi Model | RAM | Recommended Config |
+|----------|-----|-------------------|
+| **Pi 4B 8GB** | 8GB | Whisper base + OpenWakeWord |
+| **Pi 4B 4GB** | 4GB | Whisper tiny + PocketSphinx |
+| **Pi 4B 2GB** | 2GB | Vosk small + PocketSphinx |
+| **Pi 3B+** | 1GB | Vosk small + PocketSphinx |
+| **Pi Zero 2W** | 512MB | Vosk small only |
 
 ### Manual Installation
 

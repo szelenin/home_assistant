@@ -5,8 +5,8 @@ audio:
   chunk_size: 512
   sample_rate: 16000
 speech:
-  provider: vosk  # Options: vosk, google, whisper
-  language: en-US
+  provider: whisper  # Free, offline, very accurate
+  language: en
   providers:
     vosk:
       model_path: "./vosk-model-small-en-us-0.15"
@@ -19,7 +19,7 @@ speech:
       device: cpu
       temperature: 0.0
 tts:
-  provider: piper  # Options: piper, pyttsx, espeak
+  provider: pyttsx  # Switch to macOS built-in TTS
   providers:
     pyttsx:
       voice_id: com.apple.voice.compact.en-US.Samantha
@@ -38,14 +38,14 @@ tts:
       speaker_id: null
       output_raw: false
 wake_word:
-  name: TestAssistant
+  name: jarvis  # Simple word for PocketSphinx
   sensitivity: 0.5
   detection:
-    provider: openwakeword  # Options: openwakeword, porcupine, pocketsphinx
+    provider: pocketsphinx  # More reliable for initial testing
     providers:
       openwakeword:
         model_path: "./openwakeword_models"
-        threshold: 0.5
+        threshold: 0.001  # Even more sensitive
         inference_framework: "onnx"
       porcupine:
         access_key: "your-picovoice-key-here"
@@ -53,4 +53,4 @@ wake_word:
       pocketsphinx:
         hmm_path: null
         dict_path: null
-        keyphrase_threshold: 1e-20
+        keyphrase_threshold: 0.00000000000000000001  # Very sensitive threshold
