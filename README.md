@@ -1034,21 +1034,41 @@ Ensure you have the required system dependencies installed first (see [System De
    pip install -r requirements.txt
    ```
 
-4. **Download Vosk speech recognition model:**
+4. **Setup platform-specific configuration:**
+
+   The system uses platform-specific configurations optimized for each operating system:
+
+   **For macOS:**
+   ```bash
+   cp config.macos.yaml config.yaml
+   ```
+
+   **For Linux/Raspberry Pi:**
+   ```bash
+   cp config.linux.yaml config.yaml
+   ```
+
+   **Platform differences:**
+   - **macOS**: Uses pyttsx (native TTS), Whisper (offline speech), system audio
+   - **Linux/Pi**: Uses eSpeak (lightweight TTS), Google Speech (online), USB audio support
+
+   You can customize `config.yaml` after copying from the platform template.
+
+5. **Download Vosk speech recognition model (optional):**
    ```bash
    # For Raspberry Pi (small model, 40MB):
    curl -LO https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip
    unzip vosk-model-small-en-us-0.15.zip
-   
+
    # For desktop/server (medium model, 50MB):
    curl -LO https://alphacephei.com/vosk/models/vosk-model-en-us-0.22.zip
    unzip vosk-model-en-us-0.22.zip
-   
-   # Update config.yaml with correct model path:
+
+   # Update config.yaml with correct model path if using Vosk:
    # Edit the 'model_path' setting to point to your downloaded model
    ```
 
-5. **Configure AI Provider (Required):**
+6. **Configure AI Provider (Required):**
    
    The system uses AI providers for natural language understanding. You need at least one API key:
 
@@ -1082,13 +1102,13 @@ Ensure you have the required system dependencies installed first (see [System De
    
    **Note**: `ai_config.yaml` is automatically ignored by git to keep your API keys secure.
 
-5. Configure other settings:
+7. Configure other settings:
    ```bash
    # Edit config.yaml to customize voice and speech settings
    nano config.yaml
    ```
 
-6. **Test the installation:**
+8. **Test the installation:**
    ```bash
    # Test speech recognition providers
    python tests/integration/test_recognizer.py
@@ -1110,6 +1130,53 @@ Ensure you have the required system dependencies installed first (see [System De
    ```
 
 ## Configuration
+
+### Platform-Specific Configurations
+
+The system uses platform-specific configurations to optimize performance for different operating systems. Instead of manually editing settings, copy the appropriate platform template:
+
+#### Configuration Files
+
+- **`config.macos.yaml`** - macOS configuration (optimized for Mac)
+- **`config.linux.yaml`** - Linux/Raspberry Pi configuration (optimized for Pi)
+- **`config.yaml`** - Local runtime configuration (generated from platform template, gitignored)
+
+#### Setup Instructions
+
+**Automatic (via installation script):**
+```bash
+# Automatically detects platform and copies appropriate config
+./install-macos.sh   # For macOS
+./install-linux.sh   # For Linux/Pi
+```
+
+**Manual setup:**
+```bash
+# For macOS
+cp config.macos.yaml config.yaml
+
+# For Linux/Raspberry Pi
+cp config.linux.yaml config.yaml
+```
+
+#### Platform Differences
+
+| Component | macOS | Linux/Pi |
+|-----------|-------|----------|
+| **TTS** | pyttsx (native macOS voices) | eSpeak (lightweight) |
+| **Speech** | Whisper (offline, high accuracy) | Google Speech (online, reliable) |
+| **Audio** | System default devices | USB headset support (hw:2,0) |
+| **Wake Word** | PocketSphinx | PocketSphinx |
+
+#### Customization
+
+After copying the platform template, you can customize `config.yaml`:
+
+```bash
+nano config.yaml  # Edit your local configuration
+```
+
+**Note:** Your local `config.yaml` is automatically gitignored to prevent accidental commits of hardware-specific settings.
 
 ### Voice Settings (`config.yaml`)
 

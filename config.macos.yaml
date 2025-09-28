@@ -1,11 +1,17 @@
+# Home Assistant Configuration - macOS
+# This file contains macOS-specific settings optimized for Mac hardware and software
+
 ai:
   config_file: ai_config.yaml
   provider: anthropic
+
 audio:
   chunk_size: 512
   sample_rate: 16000
+  # macOS uses system default audio devices
+
 speech:
-  provider: whisper  # Free, offline, very accurate
+  provider: whisper  # Free, offline, very accurate on Mac
   language: en
   providers:
     vosk:
@@ -18,8 +24,9 @@ speech:
       model: base
       device: cpu
       temperature: 0.0
+
 tts:
-  provider: pyttsx  # Switch to macOS built-in TTS
+  provider: pyttsx  # Native macOS TTS with high quality voices
   providers:
     pyttsx:
       voice_id: com.apple.voice.compact.en-US.Samantha
@@ -37,15 +44,16 @@ tts:
       volume: 1.0
       speaker_id: null
       output_raw: false
+
 wake_word:
-  name: jarvis  # Simple word for PocketSphinx
+  name: jarvis
   sensitivity: 0.5
   detection:
-    provider: pocketsphinx  # More reliable for initial testing
+    provider: pocketsphinx  # Reliable for macOS
     providers:
       openwakeword:
         model_path: "./openwakeword_models"
-        threshold: 0.001  # Even more sensitive
+        threshold: 0.001
         inference_framework: "onnx"
       porcupine:
         access_key: "your-picovoice-key-here"
@@ -53,4 +61,11 @@ wake_word:
       pocketsphinx:
         hmm_path: null
         dict_path: null
-        keyphrase_threshold: 0.00000000000000000001  # Very sensitive threshold
+        keyphrase_threshold: 0.00000000000000000001
+
+# Logging
+logging:
+  level: INFO
+  file: logs/home_assistant.log
+  max_bytes: 10485760  # 10 MB
+  backup_count: 5

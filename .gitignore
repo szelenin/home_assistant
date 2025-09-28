@@ -51,3 +51,6 @@ messages.msg
 
 # AI Configuration (contains sensitive API keys)
 ai_config.yaml
+
+# Local runtime configuration (generated from platform-specific config)
+config.yaml

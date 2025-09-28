@@ -256,7 +256,23 @@ else
     print_status "OpenWakeWord models already exist ✅"
 fi
 
-# Step 8: Setup AI configuration
+# Step 8: Setup platform configuration
+print_step "Setting up platform-specific configuration..."
+if [[ ! -f "config.yaml" ]]; then
+    if [[ -f "config.linux.yaml" ]]; then
+        cp config.linux.yaml config.yaml
+        print_status "Linux-specific configuration applied ✅"
+    else
+        print_error "config.linux.yaml not found. Using default config."
+        if [[ -f "config.yaml.example" ]]; then
+            cp config.yaml.example config.yaml
+        fi
+    fi
+else
+    print_status "Configuration file already exists ✅"
+fi
+
+# Step 9: Setup AI configuration
 print_step "Setting up AI configuration..."
 if [[ ! -f "ai_config.yaml" ]]; then
     if [[ -f "ai_config.example.yaml" ]]; then
@@ -292,7 +308,7 @@ else
     print_status "AI config already exists ✅"
 fi
 
-# Step 9: Setup audio permissions (Raspberry Pi specific)
+# Step 10: Setup audio permissions (Raspberry Pi specific)
 if [[ $IS_RPI == true ]]; then
     print_step "🍓 Configuring Raspberry Pi audio settings..."
     
@@ -314,7 +330,7 @@ EOF
     fi
 fi
 
-# Step 10: Run basic test
+# Step 11: Run basic test
 print_step "Running basic system test..."
 print_status "Testing speech recognition providers..."
 python -c "
@@ -325,7 +341,7 @@ print('✅ Available speech providers:', providers)
 print('✅ System test completed successfully!')
 " && print_status "System test passed ✅" || print_warning "System test had issues, but installation may still work"
 
-# Step 11: Final instructions
+# Step 12: Final instructions
 print_step "🎉 Installation Complete!"
 echo
 print_status "Next steps:"

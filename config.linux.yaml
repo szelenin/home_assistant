@@ -1,0 +1,72 @@
+# Home Assistant Configuration - Linux/Raspberry Pi
+# This file contains Linux-specific settings optimized for Raspberry Pi and USB audio hardware
+
+ai:
+  config_file: ai_config.yaml
+  provider: anthropic
+
+audio:
+  device_name: "Logitech USB Headset"
+  input_device: "hw:2,0"
+  output_device: "plughw:2,0"
+  chunk_size: 512
+  sample_rate: 16000
+
+speech:
+  provider: google  # Reliable online service for Pi
+  language: en
+  providers:
+    vosk:
+      model_path: "./vosk-model-small-en-us-0.15"
+      confidence_threshold: 0.0
+      sample_rate: 16000
+    google:
+      show_all: false
+      language: en-US
+    whisper:
+      model: base
+      device: cpu
+      timeout: 10
+      phrase_timeout: 5
+      non_speaking_duration: 0.8
+      detect_silence: true
+
+tts:
+  provider: espeak  # Lightweight TTS for Pi
+  providers:
+    pyttsx:
+      # Linux-compatible settings (no Mac-specific voice)
+      rate: 150
+      volume: 0.5
+    espeak:
+      voice: "en"
+      speed: 150
+      pitch: 50
+      volume: 0.8
+    piper:
+      voice: "en_US-lessac-medium"
+      speaker_id: 0
+      noise_scale: 0.667
+      length_scale: 1.0
+
+wake_word:
+  provider: pocketsphinx  # Free, offline wake word detection
+  name: jarvis
+  providers:
+    pocketsphinx:
+      keyphrase_threshold: 1e-20
+    openwakeword:
+      model_path: "./openwakeword_models"
+      threshold: 0.5
+      inference_framework: onnx
+    porcupine:
+      access_key: null
+      model_path: null
+      sensitivity: 0.5
+
+# Logging
+logging:
+  level: INFO
+  file: logs/home_assistant.log
+  max_bytes: 10485760  # 10 MB
+  backup_count: 5
