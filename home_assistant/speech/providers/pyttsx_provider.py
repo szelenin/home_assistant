@@ -2,6 +2,7 @@ import pyttsx3
 import sounddevice as sd
 import platform
 import time
+import threading
 from typing import Dict, Any, List, Optional
 from ..base_tts_provider import BaseTTSProvider, TTSConfigurationError, TTSProviderUnavailableError
 
@@ -14,6 +15,13 @@ class PyttsxTTSProvider(BaseTTSProvider):
         self.engine = None
         self.platform = platform.system().lower()
         self.needs_reinitialization = self.platform in ['darwin', 'linux']
+
+        # Threading support for non-blocking TTS
+        self._tts_thread = None
+        self._speaking = False
+        self._stop_requested = False
+        self._tts_lock = threading.Lock()
+
         super().__init__(config)
     
     def _validate_config(self) -> None:
@@ -302,3 +310,161 @@ class PyttsxTTSProvider(BaseTTSProvider):
 
         # Convert to sorted list
         return sorted(list(languages))
+
+    def _tts_worker(self, text: str) -> None:
+        """Worker method for non-blocking TTS execution."""
+        try:
+            with self._tts_lock:
+                if self._stop_requested:
+                    return
+
+                self._speaking = True
+
+                # Platform-aware engine management (same as regular speak method)
+                if self.needs_reinitialization:
+                    self.logger.debug(f"Reinitializing engine for {self.platform} platform")
+                    self._initialize_provider()
+                    if not self.engine:
+                        self.logger.error("Failed to reinitialize TTS engine")
+                        return
+
+                    self._configure_voice()
+
+                    # macOS-specific settling time
+                    if self.platform == 'darwin':
+                        time.sleep(0.1)
+
+                    # Apply settings with retries for macOS consistency
+                    for attempt in range(3):
+                        self.engine.setProperty('rate', self.config['rate'])
+                        self.engine.setProperty('volume', self.config['volume'])
+
+                        actual_rate = self.engine.getProperty('rate')
+                        actual_volume = self.engine.getProperty('volume')
+
+                        if abs(actual_rate - self.config['rate']) < 1 and abs(actual_volume - self.config['volume']) < 0.1:
+                            break
+
+                        if attempt < 2:
+                            time.sleep(0.05)
+                else:
+                    # Windows - reuse existing engine
+                    if not self.engine:
+                        self._initialize_provider()
+                        self._configure_voice()
+
+                # Check for stop request before speaking
+                if self._stop_requested:
+                    return
+
+                # Speak the text
+                self.engine.say(text)
+
+                # Use startLoop for non-blocking operation
+                if hasattr(self.engine, 'startLoop'):
+                    self.engine.startLoop(False)
+
+                    # Monitor for stop requests while speaking
+                    while self.engine.isBusy() and not self._stop_requested:
+                        time.sleep(0.01)  # Small delay to prevent excessive CPU usage
+
+                    if self._stop_requested:
+                        self.engine.stop()
+
+                    self.engine.endLoop()
+                else:
+                    # Fallback to blocking mode if startLoop not available
+                    self.engine.runAndWait()
+
+        except Exception as e:
+            self.logger.error(f"TTS worker error: {e}")
+        finally:
+            with self._tts_lock:
+                self._speaking = False
+                self._stop_requested = False
+
+    def start_speaking_async(self, text: str) -> bool:
+        """
+        Start speaking text asynchronously (non-blocking).
+
+        Args:
+            text: Text to speak
+
+        Returns:
+            bool: True if started successfully
+        """
+        if not self._validate_text_input(text):
+            return False
+
+        if not self.engine:
+            self.logger.warning(f"TTS not available, would say: {text}")
+            return False
+
+        # Stop any current speech
+        self.stop_speaking()
+
+        try:
+            self._log_speech_attempt(text)
+
+            # Start TTS in separate thread
+            self._tts_thread = threading.Thread(target=self._tts_worker, args=(text,))
+            self._tts_thread.daemon = True
+            self._tts_thread.start()
+
+            self.logger.debug("Non-blocking TTS started")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to start async TTS: {e}")
+            return False
+
+    def stop_speaking(self) -> bool:
+        """
+        Stop current TTS operation.
+
+        Returns:
+            bool: True if stopped successfully
+        """
+        try:
+            with self._tts_lock:
+                if self._speaking:
+                    self._stop_requested = True
+                    if self.engine and hasattr(self.engine, 'stop'):
+                        self.engine.stop()
+
+                    self.logger.debug("TTS stop requested")
+
+            # Wait for thread to finish (with timeout)
+            if self._tts_thread and self._tts_thread.is_alive():
+                self._tts_thread.join(timeout=2.0)
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to stop TTS: {e}")
+            return False
+
+    def is_speaking(self) -> bool:
+        """
+        Check if TTS is currently speaking.
+
+        Returns:
+            bool: True if currently speaking
+        """
+        with self._tts_lock:
+            return self._speaking
+
+    def wait_for_completion(self, timeout: Optional[float] = None) -> bool:
+        """
+        Wait for current TTS to complete.
+
+        Args:
+            timeout: Maximum time to wait in seconds
+
+        Returns:
+            bool: True if completed normally, False if timeout
+        """
+        if self._tts_thread and self._tts_thread.is_alive():
+            self._tts_thread.join(timeout=timeout)
+            return not self._tts_thread.is_alive()
+        return True

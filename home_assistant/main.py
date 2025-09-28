@@ -32,6 +32,7 @@ class AssistantState(Enum):
     WAKE_WORD_DETECTED = "wake_detected"
     PROCESSING_COMMAND = "processing"
     RESPONDING = "responding"
+    RESPONDING_WITH_INTERRUPTS = "responding_with_interrupts"
     ERROR = "error"
     SHUTTING_DOWN = "shutdown"
 
@@ -338,7 +339,76 @@ class HomeAssistant:
             # Resume wake word detector audio stream
             if wake_word_paused and self.wake_word_detector and hasattr(self.wake_word_detector, 'resume_audio_stream'):
                 self.wake_word_detector.resume_audio_stream()
-    
+
+    def speak_with_interrupts(self, response: str) -> str:
+        """
+        Speak the response using TTS with wake word interrupt capability.
+
+        Args:
+            response: Text to speak
+
+        Returns:
+            str: "completed" if finished normally, "interrupted" if wake word detected
+        """
+        if not self.tts:
+            self.logger.error("TTS not available")
+            return "failed"
+
+        # Check if TTS provider supports async methods
+        if not hasattr(self.tts, 'start_speaking_async'):
+            self.logger.warning("TTS provider doesn't support async mode, falling back to blocking")
+            success = self.speak_response(response)
+            return "completed" if success else "failed"
+
+        try:
+            response_preview = response[:100] + "..." if len(response) > 100 else response
+            self.logger.info(f"🔊 [TTS START] Speaking with interrupts ({len(response)} chars): '{response_preview}'")
+
+            # Start non-blocking TTS
+            tts_start = time.time()
+            if not self.tts.start_speaking_async(response):
+                self.logger.error("Failed to start async TTS")
+                return "failed"
+
+            # Resume wake word detection during TTS (instead of pausing it)
+            if self.wake_word_detector and hasattr(self.wake_word_detector, 'resume_audio_stream'):
+                self.wake_word_detector.resume_audio_stream()
+
+            # Get user's configured wake word
+            wake_word = self.config_manager.get_wake_word()
+
+            # Monitor both TTS completion and wake word detection
+            while self.tts.is_speaking():
+                # Generic wake word detection with short timeout (works with any provider)
+                detected, confidence = self.wake_word_detector.listen_for_wake_word(
+                    wake_word=wake_word,
+                    timeout=0.1  # Short timeout for responsiveness
+                )
+
+                if detected:
+                    tts_duration = time.time() - tts_start
+                    self.logger.info(f"🛑 [INTERRUPT] Wake word detected during TTS! Stopping speech after {tts_duration:.2f}s")
+
+                    # Stop current TTS
+                    self.tts.stop_speaking()
+
+                    # Play acknowledgment (same as initial wake word detection)
+                    self.logger.debug("🔊 [TTS] Playing interrupt acknowledgment: 'Yes?'")
+                    if hasattr(self.tts, 'speak'):
+                        self.tts.speak("Yes?")
+
+                    return "interrupted"
+
+            # TTS completed naturally
+            tts_duration = time.time() - tts_start
+            self.logger.info(f"✅ [TTS SUCCESS] Response completed naturally in {tts_duration:.2f}s")
+            return "completed"
+
+        except Exception as e:
+            self.logger.error(f"❌ [TTS ERROR] TTS with interrupts error: {e}")
+            self.stats['errors'] += 1
+            return "failed"
+
     def _log_state_change(self, new_state: AssistantState, reason: str = ""):
         """Log state change with detailed timing information."""
         current_time = time.time()
@@ -400,7 +470,7 @@ class HomeAssistant:
 
                     if response:
                         self.logger.info(f"✅ AI response generated (took {ai_duration:.2f}s): '{response[:100]}{'...' if len(response) > 100 else ''}'")
-                        self._log_state_change(AssistantState.RESPONDING, f"AI generated response ({len(response)} chars)")
+                        self._log_state_change(AssistantState.RESPONDING_WITH_INTERRUPTS, f"AI generated response ({len(response)} chars)")
                         self.response_to_speak = response
                         self.stats['commands_processed'] += 1
                     else:
@@ -425,6 +495,37 @@ class HomeAssistant:
                     # Clear processed data
                     self.command_to_process = None
                     self.response_to_speak = None
+
+                elif self.current_state == AssistantState.RESPONDING_WITH_INTERRUPTS:
+                    self.logger.debug(f"🔊 [TTS WITH INTERRUPTS] Speaking response with wake word interrupt capability...")
+                    result = self.speak_with_interrupts(self.response_to_speak)
+
+                    if result == "completed":
+                        # TTS completed naturally, return to listening
+                        self.logger.info("✅ TTS completed naturally")
+                        self._log_state_change(AssistantState.LISTENING_FOR_WAKE_WORD, "TTS response completed, ready for next wake word")
+
+                        # Clear processed data
+                        self.command_to_process = None
+                        self.response_to_speak = None
+
+                    elif result == "interrupted":
+                        # Wake word detected during TTS, transition to wake word detected state
+                        self.logger.info("🛑 TTS interrupted by wake word")
+                        self._log_state_change(AssistantState.WAKE_WORD_DETECTED, "Wake word detected during TTS response")
+
+                        # Keep command_to_process and response_to_speak cleared since we're starting new interaction
+                        self.command_to_process = None
+                        self.response_to_speak = None
+
+                    else:
+                        # TTS failed, return to listening
+                        self.logger.error("❌ TTS with interrupts failed")
+                        self._log_state_change(AssistantState.LISTENING_FOR_WAKE_WORD, "TTS with interrupts failed")
+
+                        # Clear processed data
+                        self.command_to_process = None
+                        self.response_to_speak = None
                 
                 elif self.current_state == AssistantState.ERROR:
                     self.logger.warning("⚠️ [ERROR MODE] Attempting recovery...")
