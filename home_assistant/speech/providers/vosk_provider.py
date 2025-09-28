@@ -1,7 +1,7 @@
 import json
 import os
 import speech_recognition as sr
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 from ..base_speech_provider import BaseSpeechProvider, SpeechConfigurationError, SpeechProviderUnavailableError
 
 
@@ -189,3 +189,47 @@ class VoskSpeechProvider(BaseSpeechProvider):
             info['status'] = 'unavailable'
         
         return info
+
+    def get_supported_languages(self) -> List[str]:
+        """
+        Get list of supported languages for Vosk.
+
+        Languages depend on downloaded models. Returns languages with commonly available models.
+        """
+        # Extract language from model path if available
+        model_path = self.config.get('model_path', '')
+        if model_path:
+            # Common patterns: vosk-model-en-us-0.22, vosk-model-small-en-us-0.15
+            import re
+            match = re.search(r'vosk-model-(?:small-)?([a-z]{2})', model_path.lower())
+            if match:
+                return [match.group(1)]
+
+        # Return languages with commonly available Vosk models
+        return [
+            'en',  # English (multiple models)
+            'de',  # German
+            'fr',  # French
+            'es',  # Spanish
+            'ru',  # Russian
+            'it',  # Italian
+            'pt',  # Portuguese
+            'nl',  # Dutch
+            'ca',  # Catalan
+            'ar',  # Arabic
+            'gr',  # Greek
+            'fa',  # Farsi/Persian
+            'tr',  # Turkish
+            'vi',  # Vietnamese
+            'uk',  # Ukrainian
+            'kz',  # Kazakh
+            'sv',  # Swedish
+            'ja',  # Japanese
+            'eo',  # Esperanto
+            'hi',  # Hindi
+            'cs',  # Czech
+            'pl',  # Polish
+            'uz',  # Uzbek
+            'ko',  # Korean
+            'zh',  # Chinese
+        ]

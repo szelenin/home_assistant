@@ -7,6 +7,7 @@ Simplified architecture that uses provider-native function calling instead of cu
 
 from typing import Dict, Any, Optional, Type, List
 import json
+import time
 
 from .base_provider import BaseAIProvider, AIResponse, IntentType, ToolCall
 from .anthropic_provider import AnthropicProvider  
@@ -125,20 +126,35 @@ class AIOrchestrator:
             api_definitions = {}
             if self.api_registry:
                 api_definitions = self.api_registry.get_all_apis()
-            
+                self.logger.debug(f"📋 [API REGISTRY] {len(api_definitions)} API methods available: {list(api_definitions.keys())}")
+
             # Get AI response with function calling
+            self.logger.debug(f"🚀 [AI CALL] Sending to AI: '{message[:100]}{'...' if len(message) > 100 else ''}'")
+            ai_start = time.time()
             response = self._get_ai_response_with_functions(message, api_definitions, context)
+            ai_duration = time.time() - ai_start
+
+            self.logger.info(f"🤖 [AI RESPONSE] Received in {ai_duration:.2f}s: {response.tool_calls} tool calls, intent: {response.intent.value}, confidence: {response.confidence:.2f}")
             
             # If function calls were detected, execute them and format with second AI call
             if response.tool_calls and self.api_executor and self.home_apis:
+                self.logger.info(f"🔧 [FUNCTION CALLS] Executing {len(response.tool_calls)} function call(s)...")
+
                 # Execute the function calls
+                exec_start = time.time()
                 function_results = self._execute_function_calls(response.tool_calls)
-                
+                exec_duration = time.time() - exec_start
+                self.logger.info(f"✅ [FUNCTION EXEC] Completed in {exec_duration:.2f}s")
+
                 # Make second AI call to format the results naturally
+                self.logger.debug("🎨 [AI FORMAT] Making second AI call to format function results...")
+                format_start = time.time()
                 formatted_text = self._format_function_results_with_ai(
                     function_results, message, context
                 )
-                
+                format_duration = time.time() - format_start
+                self.logger.debug(f"✅ [AI FORMAT] Formatting completed in {format_duration:.2f}s")
+
                 # Update response with AI-formatted text and results
                 response.text = formatted_text
                 response.entities['function_results'] = function_results
@@ -146,7 +162,9 @@ class AIOrchestrator:
             return response
             
         except Exception as e:
-            self.logger.error(f"Error in chat processing: {e}")
+            self.logger.error(f"❌ [AI ERROR] Error in chat processing: {e}")
+            import traceback
+            self.logger.debug(f"🔍 [ERROR TRACE] {traceback.format_exc()}")
             return AIResponse(
                 text="I'm having trouble processing your request right now.",
                 intent=IntentType.UNKNOWN,
@@ -164,12 +182,15 @@ class AIOrchestrator:
         # Try primary provider first
         if self.current_provider:
             try:
+                provider_start = time.time()
                 response = self.current_provider.chat_with_functions(
                     message, api_definitions, context
                 )
-                self.logger.debug(
-                    f"Response from {self.current_provider.get_provider_name()}: "
-                    f"{response.intent.value}, {len(response.tool_calls)} function calls"
+                provider_duration = time.time() - provider_start
+
+                self.logger.info(
+                    f"✅ [PROVIDER] {self.current_provider.get_provider_name()} responded in {provider_duration:.2f}s: "
+                    f"{response.intent.value}, {len(response.tool_calls)} tool calls, confidence: {response.confidence:.2f}"
                 )
                 return response
             except Exception as e:
@@ -216,10 +237,10 @@ class AIOrchestrator:
                     'result': result
                 })
                 
-                self.logger.info(f"Executed function {tool_call.name}: {result.get('success', False)}")
+                # Logging moved above to the main execution block
                 
             except Exception as e:
-                self.logger.error(f"Error executing function {tool_call.name}: {e}")
+                self.logger.error(f"❌ [FUNC {i}] {tool_call.name} failed: {e}")
                 function_results.append({
                     'tool_call_id': tool_call.id,
                     'result': {'success': False, 'error': str(e)}

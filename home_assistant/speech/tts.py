@@ -1,6 +1,6 @@
 import yaml
 import os
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from ..utils.logger import setup_logging
 from .base_tts_provider import BaseTTSProvider, TTSConfigurationError, TTSProviderUnavailableError
 from .providers.pyttsx_provider import PyttsxTTSProvider
@@ -95,7 +95,13 @@ class TextToSpeech:
     def get_available_voices(self):
         """Get list of available voices from current provider."""
         return self.provider.get_available_voices()
-    
+
+    def get_supported_languages(self) -> List[str]:
+        """Get list of supported languages from current TTS provider."""
+        if self.provider:
+            return self.provider.get_supported_languages()
+        return []
+
     def is_available(self) -> bool:
         """Check if current TTS provider is available."""
         return self.provider.is_available()

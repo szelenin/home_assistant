@@ -265,7 +265,7 @@ class PyttsxTTSProvider(BaseTTSProvider):
         """Set volume level."""
         if not self.engine:
             return False
-        
+
         try:
             self.engine.setProperty('volume', volume)
             self.config['volume'] = volume
@@ -274,3 +274,31 @@ class PyttsxTTSProvider(BaseTTSProvider):
         except Exception as e:
             self.logger.error(f"Failed to set volume: {e}")
             return False
+
+    def get_supported_languages(self) -> List[str]:
+        """
+        Get list of supported languages for pyttsx.
+
+        Returns languages based on available system voices.
+        """
+        languages = set()
+
+        try:
+            # Get all available voices
+            voices = self.get_available_voices()
+
+            # Extract unique language codes from voices
+            for voice in voices:
+                language = voice.get('language', '')
+                if language:
+                    # Extract base language code (e.g., 'en' from 'en-US')
+                    base_lang = language.split('-')[0].split('_')[0].lower()
+                    if base_lang:
+                        languages.add(base_lang)
+        except Exception as e:
+            self.logger.warning(f"Failed to get supported languages: {e}")
+            # Return default English if unable to get voices
+            return ['en']
+
+        # Convert to sorted list
+        return sorted(list(languages))

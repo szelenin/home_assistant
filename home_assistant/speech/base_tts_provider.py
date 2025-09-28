@@ -111,15 +111,25 @@ class BaseTTSProvider(ABC):
     def set_volume(self, volume: float) -> bool:
         """
         Set speech volume.
-        
+
         Args:
             volume: Volume level (0.0 to 1.0)
-            
+
         Returns:
             bool: True if successful, False otherwise
         """
         pass
-    
+
+    @abstractmethod
+    def get_supported_languages(self) -> List[str]:
+        """
+        Get list of supported languages for this TTS provider.
+
+        Returns:
+            List of language codes (e.g., ['en', 'es', 'fr'])
+        """
+        pass
+
     def get_provider_name(self) -> str:
         """Get the name of this TTS provider."""
         return self.__class__.__name__.replace("TTSProvider", "").lower()

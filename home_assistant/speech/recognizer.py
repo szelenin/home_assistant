@@ -1,6 +1,6 @@
 import yaml
 import os
-from typing import Optional, Dict, Any, Tuple
+from typing import Optional, Dict, Any, Tuple, List
 from ..utils.logger import setup_logging
 from .base_speech_provider import BaseSpeechProvider, SpeechConfigurationError, SpeechProviderUnavailableError
 from .providers.vosk_provider import VoskSpeechProvider
@@ -90,7 +90,13 @@ class SpeechRecognizer:
         if self.provider:
             return self.provider.get_engine_info()
         return {'status': 'not_initialized'}
-    
+
+    def get_supported_languages(self) -> List[str]:
+        """Get list of supported languages from current speech recognition provider."""
+        if self.provider:
+            return self.provider.get_supported_languages()
+        return []
+
     def listen_for_speech(self, timeout: int = 10, phrase_timeout: int = 5) -> Tuple[bool, Optional[str]]:
         """
         Listen for speech and return the recognized text using the configured provider.

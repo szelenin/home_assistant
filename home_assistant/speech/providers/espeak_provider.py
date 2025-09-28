@@ -238,10 +238,28 @@ class EspeakTTSProvider(BaseTTSProvider):
             if gap < 0:
                 self.logger.error("Gap must be >= 0")
                 return False
-            
+
             self.config['gap'] = gap
             self.logger.info(f"eSpeak gap set to: {gap} (10ms units)")
             return True
         except Exception as e:
             self.logger.error(f"Failed to set gap: {e}")
             return False
+
+    def get_supported_languages(self) -> List[str]:
+        """
+        Get list of supported languages for eSpeak.
+
+        eSpeak supports a wide range of languages.
+        """
+        # eSpeak supports many languages, here are the most common ones
+        # Language codes based on eSpeak --voices output
+        return [
+            'af', 'an', 'bg', 'bs', 'ca', 'cs', 'cy', 'da', 'de',
+            'el', 'en', 'eo', 'es', 'et', 'fa', 'fi', 'fr', 'ga',
+            'hi', 'hr', 'hu', 'hy', 'id', 'is', 'it', 'ja', 'ka',
+            'kn', 'ko', 'ku', 'la', 'lt', 'lv', 'mk', 'ml', 'ms',
+            'ne', 'nl', 'no', 'pa', 'pl', 'pt', 'ro', 'ru', 'sk',
+            'sq', 'sr', 'sv', 'sw', 'ta', 'te', 'tr', 'uk', 'vi',
+            'zh'
+        ]

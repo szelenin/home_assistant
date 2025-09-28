@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 from ..utils.logger import setup_logging
 
 
@@ -76,12 +76,22 @@ class BaseSpeechProvider(ABC):
     def get_engine_info(self) -> Dict[str, Any]:
         """
         Get information about the speech recognition engine.
-        
+
         Returns:
             Dict[str, Any]: Engine information including name, version, capabilities
         """
         pass
-    
+
+    @abstractmethod
+    def get_supported_languages(self) -> List[str]:
+        """
+        Get list of supported languages for this speech recognition provider.
+
+        Returns:
+            List of language codes (e.g., ['en', 'es', 'fr'])
+        """
+        pass
+
     def _validate_timeout_params(self, timeout: int, phrase_timeout: int) -> None:
         """
         Validate timeout parameters.

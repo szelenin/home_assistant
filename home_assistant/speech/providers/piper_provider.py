@@ -381,10 +381,40 @@ class PiperTTSProvider(BaseTTSProvider):
             if speaker_id is not None and (not isinstance(speaker_id, int) or speaker_id < 0):
                 self.logger.error("Speaker ID must be a non-negative integer or None")
                 return False
-            
+
             self.config['speaker_id'] = speaker_id
             self.logger.info(f"Piper speaker ID set to: {speaker_id}")
             return True
         except Exception as e:
             self.logger.error(f"Failed to set speaker ID: {e}")
             return False
+
+    def get_supported_languages(self) -> List[str]:
+        """
+        Get list of supported languages for Piper.
+
+        Languages depend on available models. Returns languages for common models.
+        """
+        # Extract language from current model name if available
+        model_name = self.config.get('model', '')
+        if model_name:
+            # Common pattern: en_US-xxx, de_DE-xxx, etc.
+            if '_' in model_name or '-' in model_name:
+                lang_code = model_name.split('_')[0].split('-')[0].lower()
+                if lang_code:
+                    return [lang_code]
+
+        # Return common Piper-supported languages
+        # This list represents commonly available Piper models
+        return [
+            'en',  # English (many models)
+            'de',  # German
+            'es',  # Spanish
+            'fr',  # French
+            'it',  # Italian
+            'nl',  # Dutch
+            'pl',  # Polish
+            'pt',  # Portuguese
+            'ru',  # Russian
+            'zh',  # Chinese
+        ]

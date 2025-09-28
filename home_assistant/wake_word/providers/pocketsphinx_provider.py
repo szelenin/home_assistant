@@ -124,19 +124,22 @@ class PocketSphinxProvider(BaseWakeWordProvider):
     def listen_for_wake_word(self, wake_word: str, timeout: Optional[int] = None) -> Tuple[bool, float]:
         """
         Listen for the wake word using PocketSphinx.
-        
+
         Args:
             wake_word: The wake word to listen for
             timeout: Optional timeout in seconds (None for indefinite listening)
-            
+
         Returns:
             Tuple[bool, float]: (detected, confidence_score)
         """
         if not self.is_available():
             raise WakeWordProviderUnavailableError("PocketSphinx provider is not available")
-        
+
         self._initialize_pocketsphinx(wake_word)
-        self._setup_audio()
+
+        # Only setup audio if not already setup
+        if not hasattr(self, 'audio_stream') or not self.audio_stream:
+            self._setup_audio()
         
         try:
             self.logger.info(f"Listening for wake word with PocketSphinx: '{wake_word}'")
@@ -189,14 +192,10 @@ class PocketSphinxProvider(BaseWakeWordProvider):
             self.logger.error(f"Error during PocketSphinx wake word detection: {e}")
             raise WakeWordProviderUnavailableError(f"PocketSphinx wake word detection failed: {e}")
         finally:
-            # Clean up
+            # Clean up decoder state but keep audio stream for reuse
             if self.decoder:
                 self.decoder.end_utt()
-            if hasattr(self, 'audio_stream') and self.audio_stream:
-                self.audio_stream.stop_stream()
-                self.audio_stream.close()
-            if hasattr(self, 'audio'):
-                self.audio.terminate()
+            # Note: Keep audio stream open for reuse in subsequent calls
     
     def is_available(self) -> bool:
         """
@@ -309,6 +308,28 @@ class PocketSphinxProvider(BaseWakeWordProvider):
         # PocketSphinx supports arbitrary keyphrases
         return None
     
+    def pause_audio_stream(self):
+        """Pause the audio stream to avoid conflicts with TTS."""
+        try:
+            if hasattr(self, 'audio_stream') and self.audio_stream:
+                self.logger.debug("⏸️ [AUDIO PAUSE] Pausing PocketSphinx audio stream for TTS")
+                self.audio_stream.stop_stream()
+                return True
+        except Exception as e:
+            self.logger.warning(f"Failed to pause PocketSphinx audio stream: {e}")
+        return False
+
+    def resume_audio_stream(self):
+        """Resume the audio stream after TTS is complete."""
+        try:
+            if hasattr(self, 'audio_stream') and self.audio_stream:
+                self.logger.debug("▶️ [AUDIO RESUME] Resuming PocketSphinx audio stream after TTS")
+                self.audio_stream.start_stream()
+                return True
+        except Exception as e:
+            self.logger.warning(f"Failed to resume PocketSphinx audio stream: {e}")
+        return False
+
     def cleanup(self):
         """Clean up PocketSphinx resources."""
         try:

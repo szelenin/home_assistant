@@ -23,8 +23,8 @@ class WakeWordDetectorIntegrationTests(unittest.TestCase):
 
     def setUp(self):
         """Set up test configuration."""
-        # Create a test wake word
-        self.test_wake_word = "TestAssistant"
+        # Use a supported OpenWakeWord wake word for testing
+        self.test_wake_word = "alexa"
         
     def test_openwakeword_provider_initialization(self):
         """Test OpenWakeWord provider initialization and availability."""

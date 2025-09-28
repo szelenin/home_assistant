@@ -54,6 +54,32 @@ class OpenWakeWordProvider(BaseWakeWordProvider):
         
         self.logger.debug(f"OpenWakeWord provider initialized with model_path: {self.model_path}")
     
+    def _get_model_name_for_wake_word(self, wake_word: str) -> Optional[str]:
+        """
+        Get the OpenWakeWord model name for a given wake word.
+        
+        Args:
+            wake_word: The wake word (normalized to lowercase)
+            
+        Returns:
+            Optional[str]: The model name if found, None otherwise
+        """
+        wake_word_mappings = {
+            'alexa': 'alexa_v0.1',
+            'hey jarvis': 'hey_jarvis_v0.1', 
+            'hey_jarvis': 'hey_jarvis_v0.1',
+            'jarvis': 'hey_jarvis_v0.1',
+            'hey mycroft': 'hey_mycroft_v0.1',
+            'hey_mycroft': 'hey_mycroft_v0.1', 
+            'mycroft': 'hey_mycroft_v0.1',
+            'hey rhasspy': 'hey_rhasspy_v0.1',
+            'hey_rhasspy': 'hey_rhasspy_v0.1',
+            'rhasspy': 'hey_rhasspy_v0.1',
+            'timer': 'timer_v0.1',
+            'weather': 'weather_v0.1'
+        }
+        return wake_word_mappings.get(wake_word)
+    
     def _initialize_openwakeword(self):
         """Initialize OpenWakeWord components if not already done."""
         if self.oww_model is not None:
@@ -168,11 +194,16 @@ class OpenWakeWordProvider(BaseWakeWordProvider):
                         # Get predictions from OpenWakeWord
                         prediction = self.oww_model.predict(audio_array)
                         
-                        # Check for wake word detection
-                        for model_name, score in prediction.items():
+                        # Check for wake word detection - only for the requested wake word
+                        target_model = self._get_model_name_for_wake_word(wake_word.strip().lower())
+                        if target_model:
+                            score = prediction.get(target_model, 0.0)
                             if score > self.threshold:
-                                self.logger.info(f"Wake word detected! Model: {model_name}, Score: {score:.3f}")
+                                self.logger.info(f"Wake word '{wake_word}' detected! Model: {target_model}, Score: {score:.3f}")
                                 return True, float(score)
+                        else:
+                            self.logger.warning(f"No model found for wake word: '{wake_word}'")
+                            return False, 0.0
                     
                     except Exception as e:
                         self.logger.warning(f"Error processing audio chunk: {e}")
@@ -264,13 +295,13 @@ class OpenWakeWordProvider(BaseWakeWordProvider):
         """
         Validate wake word for OpenWakeWord.
         
-        OpenWakeWord supports custom wake words but requires pre-trained models.
+        OpenWakeWord requires pre-trained models for specific wake words.
         
         Args:
             wake_word: The wake word to validate
             
         Returns:
-            bool: True if valid (basic validation, actual model availability checked separately)
+            bool: True if valid and has a trained model available
         """
         if not super().validate_wake_word(wake_word):
             return False
@@ -283,6 +314,40 @@ class OpenWakeWordProvider(BaseWakeWordProvider):
         if len(words) > 4:
             self.logger.warning(f"Wake word too long (>4 words): '{wake_word}'")
             return False
+        
+        # Check if we have a trained model for this wake word
+        try:
+            model_name = self._get_model_name_for_wake_word(wake_word)
+            if model_name:
+                # Verify the model is actually loaded
+                self._initialize_openwakeword()
+                if self.oww_model and hasattr(self.oww_model, 'models'):
+                    available_models = list(self.oww_model.models.keys())
+                    if model_name in available_models:
+                        return True
+                    else:
+                        self.logger.warning(f"Model '{model_name}' not loaded for wake word: '{wake_word}'")
+                        return False
+                else:
+                    # Fallback to basic validation if model not accessible
+                    self.logger.debug("Could not access OpenWakeWord models for validation")
+                    return True
+            else:
+                self.logger.warning(f"No trained model available for wake word: '{wake_word}'")
+                self.logger.info(f"Available wake words: {['alexa', 'hey jarvis', 'hey mycroft', 'hey rhasspy', 'timer', 'weather']}")
+                return False
+                
+        except Exception as e:
+            self.logger.debug(f"Error validating wake word: {e}")
+            # Only fallback to basic validation if we can't initialize the model at all
+            model_name = self._get_model_name_for_wake_word(wake_word)
+            if model_name:
+                # If we have a mapping but can't validate, assume it's valid
+                return True
+            else:
+                # If we don't have a mapping, it's definitely not supported
+                self.logger.warning(f"Wake word '{wake_word}' not supported by OpenWakeWord")
+                return False
         
         # Each word should be reasonable length
         for word in words:
