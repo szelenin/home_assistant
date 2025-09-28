@@ -1,6 +1,8 @@
 import subprocess
 import platform
 import shutil
+import os
+import yaml
 from typing import Dict, Any, List, Optional
 from ..base_tts_provider import BaseTTSProvider, TTSConfigurationError, TTSProviderUnavailableError
 
@@ -12,8 +14,34 @@ class EspeakTTSProvider(BaseTTSProvider):
         """Initialize the eSpeak-NG TTS provider."""
         self.espeak_cmd = None
         self.platform = platform.system().lower()
+        self.output_device = None
         super().__init__(config)
-    
+
+        # Load audio configuration for output device
+        self._load_audio_config()
+
+    def _load_audio_config(self):
+        """Load audio configuration from main config file."""
+        try:
+            # Load main config.yaml from project root
+            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    main_config = yaml.safe_load(f)
+
+                audio_config = main_config.get('audio', {})
+                self.output_device = audio_config.get('output_device')
+
+                if self.output_device:
+                    self.logger.info(f"Using configured output device: {self.output_device}")
+                else:
+                    self.logger.debug("No output device specified, using default")
+            else:
+                self.logger.warning("config.yaml not found, using default audio device")
+
+        except Exception as e:
+            self.logger.warning(f"Error loading audio config: {e}, using default audio device")
+
     def _validate_config(self) -> None:
         """Validate eSpeak-specific configuration."""
         # Set defaults if not provided
@@ -98,26 +126,58 @@ class EspeakTTSProvider(BaseTTSProvider):
             self._log_speech_attempt(text)
             
             # Build eSpeak command with parameters
-            cmd = [
-                self.espeak_cmd,
-                '-v', str(self.config['voice']),
-                '-s', str(self.config['rate']),
-                '-a', str(self.config['volume']),
-                '-p', str(self.config['pitch']),
-                '-g', str(self.config['gap']),
-                text
-            ]
+            if self.output_device and self.platform == 'linux':
+                # On Linux, pipe eSpeak output to aplay with specific device
+                espeak_cmd = [
+                    self.espeak_cmd,
+                    '-v', str(self.config['voice']),
+                    '-s', str(self.config['rate']),
+                    '-a', str(self.config['volume']),
+                    '-p', str(self.config['pitch']),
+                    '-g', str(self.config['gap']),
+                    '--stdout',  # Output WAV to stdout
+                    text
+                ]
+                aplay_cmd = ['aplay', '-D', self.output_device]
+
+                self.logger.debug(f"Running eSpeak | aplay: {' '.join(espeak_cmd)} | {' '.join(aplay_cmd)}")
+                self.logger.debug(f"Using audio output device: {self.output_device}")
+
+                # Pipe eSpeak output to aplay
+                espeak_process = subprocess.Popen(espeak_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                aplay_process = subprocess.Popen(aplay_cmd, stdin=espeak_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                # Close the stdout of espeak_process to allow it to receive a SIGPIPE if aplay_process exits
+                espeak_process.stdout.close()
+
+                # Wait for both processes to complete
+                aplay_output, aplay_error = aplay_process.communicate(timeout=30)
+                espeak_process.wait()
+
+                result_code = aplay_process.returncode
+            else:
+                # Default behavior for other platforms or when no output device specified
+                cmd = [
+                    self.espeak_cmd,
+                    '-v', str(self.config['voice']),
+                    '-s', str(self.config['rate']),
+                    '-a', str(self.config['volume']),
+                    '-p', str(self.config['pitch']),
+                    '-g', str(self.config['gap']),
+                    text
+                ]
+
+                self.logger.debug(f"Running eSpeak command: {' '.join(cmd)}")
+
+                # Execute eSpeak normally
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+                result_code = result.returncode
             
-            self.logger.debug(f"Running eSpeak command: {' '.join(cmd)}")
-            
-            # Execute eSpeak
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            
-            if result.returncode == 0:
+            if result_code == 0:
                 self.logger.info("eSpeak TTS completed successfully")
                 return True
             else:
-                self.logger.error(f"eSpeak failed with return code {result.returncode}: {result.stderr}")
+                self.logger.error(f"eSpeak failed with return code {result_code}")
                 return False
                 
         except subprocess.TimeoutExpired:
