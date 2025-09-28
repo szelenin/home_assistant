@@ -9,6 +9,7 @@ audio:
   chunk_size: 512
   sample_rate: 16000
   # macOS uses system default audio devices
+  device_patterns: []  # Empty list uses system default
 
 speech:
   provider: whisper  # Free, offline, very accurate on Mac

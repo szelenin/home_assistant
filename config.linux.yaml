@@ -11,6 +11,8 @@ audio:
   output_device: "plughw:2,0"
   chunk_size: 512
   sample_rate: 16000
+  # Device matching patterns for auto-detection
+  device_patterns: ["USB", "Headset", "Logitech"]
 
 speech:
   provider: google  # Reliable online service for Pi

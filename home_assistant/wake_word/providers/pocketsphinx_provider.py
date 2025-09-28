@@ -29,7 +29,7 @@ class PocketSphinxProvider(BaseWakeWordProvider):
     def __init__(self, config: Dict[str, Any]):
         """
         Initialize PocketSphinx provider.
-        
+
         Args:
             config: Configuration dictionary containing:
                 - hmm_path: Path to acoustic model (optional, uses default)
@@ -37,23 +37,93 @@ class PocketSphinxProvider(BaseWakeWordProvider):
                 - keyphrase_threshold: Detection threshold (default: 1e-20)
         """
         super().__init__(config)
-        
+
         self.hmm_path = config.get('hmm_path')  # Acoustic model
         self.dict_path = config.get('dict_path')  # Dictionary
         self.keyphrase_threshold = config.get('keyphrase_threshold', 1e-20)
-        
+
         # PocketSphinx components (initialized lazily)
         self.decoder = None
-        
-        # Audio processing
+
+        # Audio processing - load from main config
         self.sample_rate = 16000
         self.chunk_size = 1024
-        
+        self.audio_device_index = None
+        self.input_device = None
+
+        # Load audio configuration
+        self._load_audio_config()
+
         # State management
         self._current_keyphrase = None
-        
+
         self.logger.debug(f"PocketSphinx provider initialized with threshold: {self.keyphrase_threshold}")
-    
+
+    def _load_audio_config(self):
+        """Load audio configuration from main config file."""
+        try:
+            import yaml
+            import os
+
+            # Load main config.yaml from project root
+            config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'config.yaml')
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    main_config = yaml.safe_load(f)
+
+                audio_config = main_config.get('audio', {})
+                self.input_device = audio_config.get('input_device')
+                self.device_patterns = audio_config.get('device_patterns', [])
+
+                if self.input_device:
+                    self.logger.info(f"Using configured input device: {self.input_device}")
+                    # Convert device string like "hw:2,0" to PyAudio device index
+                    self._find_device_index()
+                else:
+                    self.logger.debug("No input device specified, using default")
+
+            else:
+                self.logger.warning("config.yaml not found, using default audio device")
+
+        except Exception as e:
+            self.logger.warning(f"Error loading audio config: {e}, using default audio device")
+
+    def _find_device_index(self):
+        """Find PyAudio device index for the configured input device."""
+        try:
+            import pyaudio
+
+            audio = pyaudio.PyAudio()
+
+            # For hw:X,Y format, try to find device by name or index
+            if self.input_device.startswith('hw:'):
+                # Extract card number from hw:X,Y
+                try:
+                    card_num = int(self.input_device.split(':')[1].split(',')[0])
+
+                    # Find device by checking device info
+                    for i in range(audio.get_device_count()):
+                        device_info = audio.get_device_info_by_index(i)
+
+                        # Check if this is an input device and matches configured patterns
+                        if device_info['maxInputChannels'] > 0:
+                            # Check if device name matches any configured patterns
+                            device_matches = any(pattern.lower() in device_info['name'].lower()
+                                               for pattern in self.device_patterns) if self.device_patterns else False
+
+                            if device_matches:
+                                self.audio_device_index = i
+                                self.logger.info(f"Found configured audio device at index {i}: {device_info['name']}")
+                                break
+
+                except (ValueError, IndexError):
+                    pass
+
+            audio.terminate()
+
+        except Exception as e:
+            self.logger.warning(f"Error finding device index: {e}")
+
     def _initialize_pocketsphinx(self, wake_word: str):
         """Initialize PocketSphinx decoder with the specified wake word."""
         if self.decoder is not None and self._current_keyphrase == wake_word:
@@ -104,22 +174,49 @@ class PocketSphinxProvider(BaseWakeWordProvider):
         """Set up audio recording for wake word detection."""
         try:
             import pyaudio
-            
+
             self.audio = pyaudio.PyAudio()
-            self.audio_stream = self.audio.open(
-                format=pyaudio.paInt16,
-                channels=1,
-                rate=self.sample_rate,
-                input=True,
-                frames_per_buffer=self.chunk_size
-            )
-            
+
+            # Use configured audio device index if available
+            audio_kwargs = {
+                'format': pyaudio.paInt16,
+                'channels': 1,
+                'rate': self.sample_rate,
+                'input': True,
+                'frames_per_buffer': self.chunk_size
+            }
+
+            if self.audio_device_index is not None:
+                audio_kwargs['input_device_index'] = self.audio_device_index
+                self.logger.info(f"Opening audio stream with device index: {self.audio_device_index}")
+            else:
+                self.logger.debug("Using default audio device for PocketSphinx")
+
+            self.audio_stream = self.audio.open(**audio_kwargs)
+
             self.logger.debug("Audio stream setup complete for PocketSphinx")
-            
+
         except ImportError:
             raise WakeWordProviderUnavailableError(
                 "PyAudio not available. Install with: pip install pyaudio"
             )
+        except Exception as e:
+            # If specific device fails, try default
+            if self.audio_device_index is not None:
+                self.logger.warning(f"Failed to open configured device {self.audio_device_index}, trying default: {e}")
+                try:
+                    self.audio_stream = self.audio.open(
+                        format=pyaudio.paInt16,
+                        channels=1,
+                        rate=self.sample_rate,
+                        input=True,
+                        frames_per_buffer=self.chunk_size
+                    )
+                    self.logger.info("Using default audio device as fallback")
+                except Exception as e2:
+                    raise WakeWordProviderUnavailableError(f"Audio setup failed: {e2}")
+            else:
+                raise WakeWordProviderUnavailableError(f"Audio setup failed: {e}")
     
     def listen_for_wake_word(self, wake_word: str, timeout: Optional[int] = None) -> Tuple[bool, float]:
         """
