@@ -50,19 +50,22 @@ tts:
       length_scale: 1.0
 
 wake_word:
-  provider: pocketsphinx  # Free, offline wake word detection
   name: jarvis
-  providers:
-    pocketsphinx:
-      keyphrase_threshold: 1e-20
-    openwakeword:
-      model_path: "./openwakeword_models"
-      threshold: 0.5
-      inference_framework: onnx
-    porcupine:
-      access_key: null
-      model_path: null
-      sensitivity: 0.5
+  sensitivity: 0.5
+  detection:
+    provider: pocketsphinx  # Free, offline wake word detection for Pi
+    providers:
+      pocketsphinx:
+        hmm_path: null
+        dict_path: null
+        keyphrase_threshold: 0.00000000000000000001
+      openwakeword:
+        model_path: "./openwakeword_models"
+        threshold: 0.5
+        inference_framework: onnx
+      porcupine:
+        access_key: "your-picovoice-key-here"
+        keyword_path: null
 
 # Logging
 logging:
