@@ -127,34 +127,82 @@ class EspeakTTSProvider(BaseTTSProvider):
             
             # Build eSpeak command with parameters
             if self.output_device and self.platform == 'linux':
-                # On Linux, pipe eSpeak output to aplay with specific device
-                espeak_cmd = [
-                    self.espeak_cmd,
-                    '-v', str(self.config['voice']),
-                    '-s', str(self.config['rate']),
-                    '-a', str(self.config['volume']),
-                    '-p', str(self.config['pitch']),
-                    '-g', str(self.config['gap']),
-                    '--stdout',  # Output WAV to stdout
-                    text
-                ]
-                aplay_cmd = ['aplay', '-D', self.output_device]
+                # On Linux, check if we should use PulseAudio or ALSA
+                # First, try to detect if PulseAudio is running
+                pulse_running = subprocess.run(['pactl', 'info'], capture_output=True, timeout=1).returncode == 0
 
-                self.logger.debug(f"Running eSpeak | aplay: {' '.join(espeak_cmd)} | {' '.join(aplay_cmd)}")
-                self.logger.debug(f"Using audio output device: {self.output_device}")
+                if pulse_running:
+                    # Use PulseAudio - pipe to paplay with specific device
+                    espeak_cmd = [
+                        self.espeak_cmd,
+                        '-v', str(self.config['voice']),
+                        '-s', str(self.config['rate']),
+                        '-a', str(self.config['volume']),
+                        '-p', str(self.config['pitch']),
+                        '-g', str(self.config['gap']),
+                        '--stdout',  # Output WAV to stdout
+                        text
+                    ]
 
-                # Pipe eSpeak output to aplay
-                espeak_process = subprocess.Popen(espeak_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                aplay_process = subprocess.Popen(aplay_cmd, stdin=espeak_process.stdout, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    # Convert ALSA device to PulseAudio sink
+                    if 'plughw:2,0' in self.output_device or 'hw:2' in self.output_device:
+                        # Try to find USB audio sink in PulseAudio
+                        sink_result = subprocess.run(['pactl', 'list', 'short', 'sinks'],
+                                                   capture_output=True, text=True, timeout=1)
+                        usb_sink = None
+                        for line in sink_result.stdout.splitlines():
+                            if 'usb' in line.lower() or 'logitech' in line.lower():
+                                usb_sink = line.split()[1]  # Get sink name
+                                break
 
-                # Close the stdout of espeak_process to allow it to receive a SIGPIPE if aplay_process exits
-                espeak_process.stdout.close()
+                        if usb_sink:
+                            paplay_cmd = ['paplay', '--device=' + usb_sink]
+                            self.logger.debug(f"Using PulseAudio USB sink: {usb_sink}")
+                        else:
+                            paplay_cmd = ['paplay']
+                            self.logger.debug("USB sink not found, using default PulseAudio sink")
+                    else:
+                        paplay_cmd = ['paplay']
 
-                # Wait for both processes to complete
-                aplay_output, aplay_error = aplay_process.communicate(timeout=30)
-                espeak_process.wait()
+                    self.logger.debug(f"Running eSpeak | paplay: {' '.join(espeak_cmd)} | {' '.join(paplay_cmd)}")
 
-                result_code = aplay_process.returncode
+                    # Pipe eSpeak output to paplay
+                    espeak_process = subprocess.Popen(espeak_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    paplay_process = subprocess.Popen(paplay_cmd, stdin=espeak_process.stdout,
+                                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                    espeak_process.stdout.close()
+                    paplay_output, paplay_error = paplay_process.communicate(timeout=30)
+                    espeak_process.wait()
+
+                    result_code = paplay_process.returncode
+                else:
+                    # PulseAudio not running, use ALSA
+                    espeak_cmd = [
+                        self.espeak_cmd,
+                        '-v', str(self.config['voice']),
+                        '-s', str(self.config['rate']),
+                        '-a', str(self.config['volume']),
+                        '-p', str(self.config['pitch']),
+                        '-g', str(self.config['gap']),
+                        '--stdout',  # Output WAV to stdout
+                        text
+                    ]
+                    aplay_cmd = ['aplay', '-D', self.output_device]
+
+                    self.logger.debug(f"Running eSpeak | aplay: {' '.join(espeak_cmd)} | {' '.join(aplay_cmd)}")
+                    self.logger.debug(f"Using ALSA output device: {self.output_device}")
+
+                    # Pipe eSpeak output to aplay
+                    espeak_process = subprocess.Popen(espeak_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    aplay_process = subprocess.Popen(aplay_cmd, stdin=espeak_process.stdout,
+                                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+                    espeak_process.stdout.close()
+                    aplay_output, aplay_error = aplay_process.communicate(timeout=30)
+                    espeak_process.wait()
+
+                    result_code = aplay_process.returncode
             else:
                 # Default behavior for other platforms or when no output device specified
                 cmd = [
