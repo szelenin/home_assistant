@@ -28,7 +28,13 @@ class PyttsxTTSProvider(BaseTTSProvider):
         """Validate pyttsx3-specific configuration."""
         # Set defaults if not provided
         if 'voice_id' not in self.config:
-            self.config['voice_id'] = "com.apple.voice.compact.en-US.Samantha"
+            # Use platform-appropriate defaults
+            if self.platform == 'darwin':
+                self.config['voice_id'] = "com.apple.voice.compact.en-US.Samantha"
+            else:
+                # For Linux/other platforms, don't set a specific voice_id
+                # Let pyttsx3 use the system default
+                self.config['voice_id'] = None
         if 'rate' not in self.config:
             self.config['rate'] = 150
         if 'volume' not in self.config:
@@ -105,19 +111,21 @@ class PyttsxTTSProvider(BaseTTSProvider):
                 self.logger.info(f"Found {len(voices)} available voices")
                 
                 # Use specified voice or default selection
-                if self.config.get('voice_id'):
+                voice_id = self.config.get('voice_id')
+                if voice_id:
                     voice_found = False
                     for voice in voices:
-                        if voice.id == self.config['voice_id']:
+                        if voice.id == voice_id:
                             self.engine.setProperty('voice', voice.id)
                             self.logger.info(f"Using specified voice: {voice.name}")
                             voice_found = True
                             break
-                    
+
                     if not voice_found:
-                        self.logger.warning(f"Specified voice ID '{self.config['voice_id']}' not found, using default")
+                        self.logger.warning(f"Specified voice ID '{voice_id}' not found, using default")
                         self._select_default_voice(voices)
                 else:
+                    # No specific voice configured, use system default or first available
                     self._select_default_voice(voices)
             
             # Set rate and volume
