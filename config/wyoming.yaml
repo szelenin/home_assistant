@@ -1,0 +1,89 @@
+# Wyoming Protocol Configuration for Home Assistant
+# This configuration enables distributed voice satellites using Wyoming protocol
+
+wyoming:
+  # Server configuration for accepting satellite connections
+  server:
+    enabled: true
+    host: "0.0.0.0"  # Listen on all interfaces
+    port: 10700      # Default Wyoming port
+
+    # Security settings (optional)
+    # password: "your-secure-password"
+    # ssl_cert: "/path/to/cert.pem"
+    # ssl_key: "/path/to/key.pem"
+
+  # Audio processing settings
+  audio:
+    # Input audio (from satellites)
+    input:
+      rate: 16000      # Sample rate for speech recognition
+      width: 2         # 16-bit audio
+      channels: 1      # Mono audio
+
+    # Output audio (to satellites)
+    output:
+      rate: 22050      # Sample rate for TTS
+      width: 2         # 16-bit audio
+      channels: 1      # Mono audio
+
+    # Audio enhancements
+    processing:
+      noise_suppression: 2    # 0-4 (4 is max)
+      auto_gain: 5            # 0-31 dbFS
+      volume_multiplier: 1.0  # Audio volume adjustment
+
+  # Satellite settings
+  satellites:
+    # Automatic discovery via Zeroconf
+    auto_discover: true
+
+    # Wake word detection
+    wake_word:
+      # Wake words that satellites should listen for
+      names:
+        - "jarvis"
+        - "hey jarvis"
+
+      # Refractory period after detection (seconds)
+      refractory_seconds: 5.0
+
+      # Timeout for remote wake word detection
+      timeout_seconds: 10.0
+
+    # Voice Activity Detection (VAD)
+    vad:
+      enabled: false  # Enable if satellites should use VAD
+      threshold: 0.5  # Silence threshold (0-1)
+      buffer_seconds: 2.0  # Audio buffer before activation
+
+    # Audio feedback sounds
+    sounds:
+      awake_wav: "sounds/awake.wav"    # Played when wake word detected
+      done_wav: "sounds/done.wav"      # Played after command processed
+      error_wav: "sounds/error.wav"    # Played on error
+
+  # Integration with existing Home Assistant components
+  integration:
+    # Use existing speech recognition
+    use_existing_stt: true
+    stt_provider: "whisper"
+
+    # Use existing TTS
+    use_existing_tts: true
+    tts_provider: "pyttsx"
+
+    # Use existing AI orchestrator
+    use_existing_ai: true
+    ai_provider: "anthropic"
+
+  # Logging
+  logging:
+    level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+
+  # Performance tuning
+  performance:
+    max_clients: 10           # Maximum concurrent satellite connections
+    audio_buffer_size: 8192   # Audio buffer size in bytes
+    reconnect_delay: 3        # Seconds before reconnection attempts
+    ping_interval: 30         # Seconds between ping/pong checks
