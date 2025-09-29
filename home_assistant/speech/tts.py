@@ -131,11 +131,64 @@ class TextToSpeech:
     def speak(self, text: str) -> bool:
         """
         Speak the given text using the current TTS provider.
-        
+
         Args:
             text: The text to speak
-            
+
         Returns:
             bool: True if successful, False otherwise
         """
         return self.provider.speak(text)
+
+    def start_speaking_async(self, text: str) -> bool:
+        """
+        Start speaking text asynchronously (non-blocking).
+
+        Args:
+            text: The text to speak
+
+        Returns:
+            bool: True if started successfully
+        """
+        if hasattr(self.provider, 'start_speaking_async'):
+            return self.provider.start_speaking_async(text)
+        else:
+            # Fallback to blocking mode if async not supported
+            self.logger.warning("TTS provider doesn't support async mode, falling back to blocking")
+            return self.provider.speak(text)
+
+    def stop_speaking(self) -> bool:
+        """
+        Stop current TTS operation.
+
+        Returns:
+            bool: True if stopped successfully
+        """
+        if hasattr(self.provider, 'stop_speaking'):
+            return self.provider.stop_speaking()
+        return True
+
+    def is_speaking(self) -> bool:
+        """
+        Check if TTS is currently speaking.
+
+        Returns:
+            bool: True if currently speaking
+        """
+        if hasattr(self.provider, 'is_speaking'):
+            return self.provider.is_speaking()
+        return False
+
+    def wait_for_completion(self, timeout: Optional[float] = None) -> bool:
+        """
+        Wait for current TTS to complete.
+
+        Args:
+            timeout: Maximum time to wait in seconds
+
+        Returns:
+            bool: True if completed normally, False if timeout
+        """
+        if hasattr(self.provider, 'wait_for_completion'):
+            return self.provider.wait_for_completion(timeout)
+        return True

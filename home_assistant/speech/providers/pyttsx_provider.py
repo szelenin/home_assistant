@@ -14,7 +14,8 @@ class PyttsxTTSProvider(BaseTTSProvider):
         """Initialize the pyttsx3 TTS provider."""
         self.engine = None
         self.platform = platform.system().lower()
-        self.needs_reinitialization = self.platform in ['darwin', 'linux']
+        self._engine_usage_count = 0  # Track engine usage
+        self._max_usage_before_reinit = 1  # Reinitialize after every use on macOS (engine degrades quickly)
 
         # Threading support for non-blocking TTS
         self._tts_thread = None
@@ -45,9 +46,24 @@ class PyttsxTTSProvider(BaseTTSProvider):
     def _initialize_provider(self) -> None:
         """Initialize the pyttsx3 engine."""
         try:
+            # Properly cleanup any existing engine first
+            if self.engine is not None:
+                try:
+                    self.engine.stop()
+                    if hasattr(self.engine, 'endLoop'):
+                        self.engine.endLoop()
+                except Exception:
+                    pass  # Ignore cleanup errors
+                self.engine = None
+
+            # Create fresh engine instance
             self.engine = pyttsx3.init()
             self._check_audio_devices()
             self._configure_voice()
+
+            # Reset usage counter after successful initialization
+            self._engine_usage_count = 0
+
         except Exception as e:
             raise TTSProviderUnavailableError(f"Failed to initialize pyttsx3: {e}")
     
@@ -167,38 +183,41 @@ class PyttsxTTSProvider(BaseTTSProvider):
         try:
             self._log_speech_attempt(text)
             
-            # Platform-aware engine management
-            if self.needs_reinitialization:
-                self.logger.debug(f"Reinitializing engine for {self.platform} platform")
+            # Smart engine management - initialize if needed or after usage threshold
+            needs_reinit = False
+            if not self.engine:
+                needs_reinit = True
+                self.logger.debug("Initializing engine (first time)")
+            elif self.platform == 'darwin' and self._engine_usage_count >= self._max_usage_before_reinit:
+                needs_reinit = True
+                self.logger.debug(f"Reinitializing engine after {self._engine_usage_count} uses on macOS")
+                self._engine_usage_count = 0
+
+            if needs_reinit:
                 self._initialize_provider()
                 if not self.engine:
-                    self.logger.error("Failed to reinitialize TTS engine")
+                    self.logger.error("Failed to initialize TTS engine")
                     return False
-                
+
                 self._configure_voice()
-                
+
                 # macOS-specific settling time
                 if self.platform == 'darwin':
                     time.sleep(0.1)
-                
+
                 # Apply settings with retries for macOS consistency
                 for attempt in range(3):
                     self.engine.setProperty('rate', self.config['rate'])
                     self.engine.setProperty('volume', self.config['volume'])
-                    
+
                     actual_rate = self.engine.getProperty('rate')
                     actual_volume = self.engine.getProperty('volume')
-                    
+
                     if abs(actual_rate - self.config['rate']) < 1 and abs(actual_volume - self.config['volume']) < 0.1:
                         break
-                    
+
                     if attempt < 2:
                         time.sleep(0.05)
-            else:
-                # Windows - reuse existing engine
-                if not self.engine:
-                    self._initialize_provider()
-                    self._configure_voice()
             
             # Verify final settings
             if self.engine:
@@ -207,9 +226,19 @@ class PyttsxTTSProvider(BaseTTSProvider):
                 self.logger.debug(f"Final settings: Rate={actual_rate}, Volume={actual_volume}")
             
             # Speak the text
+            start_time = time.time()
             self.engine.say(text)
             self.engine.runAndWait()
-            
+            duration = time.time() - start_time
+
+            # Check for TTS degradation (too fast = no audio output)
+            if duration < 0.1 and len(text) > 10:  # Short duration for long text = problem
+                self.logger.warning(f"TTS completed too quickly ({duration:.2f}s for {len(text)} chars) - forcing reinitialization")
+                self._engine_usage_count = self._max_usage_before_reinit  # Force reinit on next call
+            else:
+                # Track usage for smart reinitialization
+                self._engine_usage_count += 1
+
             self.logger.info("TTS completed successfully")
             return True
         except Exception as e:
@@ -320,12 +349,20 @@ class PyttsxTTSProvider(BaseTTSProvider):
 
                 self._speaking = True
 
-                # Platform-aware engine management (same as regular speak method)
-                if self.needs_reinitialization:
-                    self.logger.debug(f"Reinitializing engine for {self.platform} platform")
+                # Smart engine management - same as regular speak method
+                needs_reinit = False
+                if not self.engine:
+                    needs_reinit = True
+                    self.logger.debug("Initializing engine (first time)")
+                elif self.platform == 'darwin' and self._engine_usage_count >= self._max_usage_before_reinit:
+                    needs_reinit = True
+                    self.logger.debug(f"Reinitializing engine after {self._engine_usage_count} uses on macOS")
+                    self._engine_usage_count = 0
+
+                if needs_reinit:
                     self._initialize_provider()
                     if not self.engine:
-                        self.logger.error("Failed to reinitialize TTS engine")
+                        self.logger.error("Failed to initialize TTS engine")
                         return
 
                     self._configure_voice()
@@ -347,34 +384,28 @@ class PyttsxTTSProvider(BaseTTSProvider):
 
                         if attempt < 2:
                             time.sleep(0.05)
-                else:
-                    # Windows - reuse existing engine
-                    if not self.engine:
-                        self._initialize_provider()
-                        self._configure_voice()
 
                 # Check for stop request before speaking
                 if self._stop_requested:
                     return
 
                 # Speak the text
+                start_time = time.time()
                 self.engine.say(text)
 
-                # Use startLoop for non-blocking operation
-                if hasattr(self.engine, 'startLoop'):
-                    self.engine.startLoop(False)
+                # Use simple runAndWait for macOS compatibility
+                # Based on research: startLoop/endLoop can cause issues on macOS
+                self.engine.runAndWait()
 
-                    # Monitor for stop requests while speaking
-                    while self.engine.isBusy() and not self._stop_requested:
-                        time.sleep(0.01)  # Small delay to prevent excessive CPU usage
+                duration = time.time() - start_time
 
-                    if self._stop_requested:
-                        self.engine.stop()
-
-                    self.engine.endLoop()
+                # Check for TTS degradation (too fast = no audio output)
+                if duration < 0.1 and len(text) > 10:  # Short duration for long text = problem
+                    self.logger.warning(f"Async TTS completed too quickly ({duration:.2f}s for {len(text)} chars) - forcing reinitialization")
+                    self._engine_usage_count = self._max_usage_before_reinit  # Force reinit on next call
                 else:
-                    # Fallback to blocking mode if startLoop not available
-                    self.engine.runAndWait()
+                    # Track usage for smart reinitialization
+                    self._engine_usage_count += 1
 
         except Exception as e:
             self.logger.error(f"TTS worker error: {e}")
