@@ -14,6 +14,225 @@ A Python-based voice-controlled home automation system with wake word detection,
 - **Device Management**: Control smart lights, thermostats, and other IoT devices
 - **Automation**: Create custom automation rules for your smart home
 - **Configuration**: YAML-based configuration system
+- **Wyoming Protocol**: Distributed voice satellites using Raspberry Pi devices
+
+## Wyoming Protocol Integration 🏠
+
+### Overview
+
+The Wyoming protocol integration enables distributed voice assistant deployments where Raspberry Pi devices act as remote voice satellites connected to your Mac-based Home Assistant server. This creates a scalable, professional voice control system throughout your home.
+
+### Architecture
+
+```
+┌─────────────────────┐         Wyoming Protocol          ┌──────────────────┐
+│  Raspberry Pi       │◄────────────────────────────────►│  Mac Server      │
+│  Satellite          │         TCP Port 10700           │  (Home Assistant) │
+├─────────────────────┤                                  ├──────────────────┤
+│ • Wake Word Detection│                                  │ • Jarvis AI      │
+│ • Microphone Input  │──────► Audio Stream ────────────►│ • Whisper STT    │
+│ • Speaker Output    │◄────── TTS Audio ◄───────────────│ • pyttsx3 TTS    │
+└─────────────────────┘                                  └──────────────────┘
+```
+
+### Key Features
+
+- **🏠 Multi-Room Voice Control**: Place Raspberry Pi satellites throughout your home
+- **🔊 Local Wake Word Detection**: Responds instantly without network latency
+- **🧠 Centralized Processing**: Heavy AI processing happens on your powerful Mac
+- **🔒 Privacy-First**: All voice processing stays on your local network
+- **📡 Professional Protocol**: Uses Home Assistant's official Wyoming standard
+
+### Quick Setup
+
+#### 1. Server Setup (Mac)
+
+```bash
+# Install Wyoming dependencies
+./venv/bin/pip install wyoming==1.5.4 pyring_buffer
+
+# Start Wyoming server
+./venv/bin/python test_wyoming_server.py
+```
+
+Your Mac will now listen on port 10700 for satellite connections.
+
+#### 2. Satellite Setup (Raspberry Pi)
+
+```bash
+# Install Wyoming-satellite
+git clone https://github.com/rhasspy/wyoming-satellite.git
+cd wyoming-satellite
+script/setup
+
+# Configure audio devices
+arecord -L  # List microphones
+aplay -L    # List speakers
+
+# Run satellite (replace with your Mac's IP and audio devices)
+script/run \
+  --name 'kitchen-satellite' \
+  --uri 'tcp://YOUR_MAC_IP:10700' \
+  --mic-command 'arecord -D plughw:1,0 -r 16000 -c 1 -f S16_LE -t raw' \
+  --snd-command 'aplay -D plughw:1,0 -r 22050 -c 1 -f S16_LE -t raw'
+```
+
+#### 3. Test the System
+
+1. **Say "jarvis"** on the Raspberry Pi
+2. **Give a command** like "what time is it?"
+3. **Hear the response** through the Pi's speakers
+
+### Benefits
+
+| Traditional Setup | Wyoming Integration |
+|------------------|-------------------|
+| ❌ Single location | ✅ Multiple rooms |
+| ❌ One microphone | ✅ Distributed microphones |
+| ❌ Limited range | ✅ Whole-house coverage |
+| ❌ Single point of failure | ✅ Redundant satellites |
+| ❌ Hardware limitations | ✅ Optimized processing |
+
+### Configuration
+
+Wyoming integration is configured via `config/wyoming.yaml`:
+
+```yaml
+wyoming:
+  server:
+    enabled: true
+    host: "0.0.0.0"
+    port: 10700
+
+  audio:
+    input:
+      rate: 16000      # Speech recognition quality
+      width: 2
+      channels: 1
+    output:
+      rate: 22050      # TTS quality
+      width: 2
+      channels: 1
+
+  integration:
+    use_existing_stt: true    # Use your Whisper setup
+    use_existing_tts: true    # Use your pyttsx3 setup
+    use_existing_ai: true     # Use your Jarvis AI
+```
+
+### Use Cases
+
+#### **🏡 Whole House Voice Control**
+- Kitchen satellite for cooking timers and recipes
+- Living room satellite for entertainment control
+- Bedroom satellite for alarms and smart lights
+- Office satellite for calendar and productivity
+
+#### **🔧 Smart Home Integration**
+- Control Philips Hue lights from any room
+- Adjust thermostats from anywhere
+- Check security cameras via voice
+- Manage home automation routines
+
+#### **🎵 Multi-Room Audio**
+- Play music announcements to all satellites
+- Room-specific audio responses
+- Intercom functionality between rooms
+- Synchronized voice feedback
+
+### Advanced Setup
+
+#### Local Wake Word Detection
+
+For even better performance, run wake word detection locally on each Pi:
+
+```bash
+# Install OpenWakeWord on Pi
+cd wyoming-satellite
+git clone https://github.com/rhasspy/wyoming-openwakeword.git
+cd wyoming-openwakeword
+script/setup
+
+# Run wake word service
+script/run --uri 'tcp://127.0.0.1:10400'
+
+# Update satellite to use local wake word
+script/run \
+  --name 'kitchen-satellite' \
+  --uri 'tcp://YOUR_MAC_IP:10700' \
+  --wake-uri 'tcp://127.0.0.1:10400' \
+  --wake-word-name 'jarvis' \
+  --mic-command 'arecord -D plughw:1,0 -r 16000 -c 1 -f S16_LE -t raw' \
+  --snd-command 'aplay -D plughw:1,0 -r 22050 -c 1 -f S16_LE -t raw'
+```
+
+#### LED Indicators
+
+Add visual feedback to your satellites:
+
+```bash
+# For ReSpeaker HATs
+cd wyoming-satellite/examples
+python3 -m venv .venv
+.venv/bin/pip3 install wyoming==1.5.2
+
+# Run LED service
+.venv/bin/python3 2mic_service.py --uri 'tcp://127.0.0.1:10500'
+
+# Update satellite to use LED events
+script/run \
+  ... \
+  --event-uri 'tcp://127.0.0.1:10500'
+```
+
+### Troubleshooting
+
+#### Connection Issues
+```bash
+# Test server connectivity
+telnet YOUR_MAC_IP 10700
+
+# Check firewall
+sudo ufw allow 10700  # Linux
+# macOS: System Preferences → Security & Privacy → Firewall
+```
+
+#### Audio Issues
+```bash
+# Test Pi microphone
+arecord -d 3 test.wav && aplay test.wav
+
+# Test Pi speakers
+speaker-test -t sine -f 1000 -l 1 -s 1
+
+# Check audio devices
+python -c "
+import pyaudio
+p = pyaudio.PyAudio()
+for i in range(p.get_device_count()):
+    info = p.get_device_info_by_index(i)
+    print(f'{i}: {info[\"name\"]} (in:{info[\"maxInputChannels\"]}, out:{info[\"maxOutputChannels\"]})')
+"
+```
+
+#### Performance Issues
+```bash
+# Monitor CPU usage on Pi
+htop
+
+# Reduce audio quality if needed (in satellite command):
+--mic-command 'arecord -D plughw:1,0 -r 8000 -c 1 -f S16_LE -t raw'
+
+# Use lightweight wake word detection
+# Switch from OpenWakeWord to PocketSphinx
+```
+
+### Documentation
+
+- **📖 Complete Setup Guide**: [WYOMING_INTEGRATION.md](WYOMING_INTEGRATION.md)
+- **🔧 Server API Reference**: `home_assistant/wyoming/`
+- **🧪 Test Scripts**: `test_wyoming_server.py`, `test_wyoming_client.py`
+- **⚙️ Configuration Reference**: `config/wyoming.yaml`
 
 ## Getting Started
 
