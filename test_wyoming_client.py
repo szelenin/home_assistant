@@ -22,7 +22,7 @@ logger = logging.getLogger("test_client")
 
 async def test_wyoming_connection():
     """Test connection to Wyoming server."""
-    host = "localhost"
+    host = "192.168.86.20"  # Pi satellite
     port = 10700
 
     logger.info(f"Connecting to Wyoming server at {host}:{port}...")
