@@ -8,6 +8,7 @@ import asyncio
 import logging
 import yaml
 import os
+import subprocess
 from typing import Optional, Dict, Any
 import numpy as np
 import io
@@ -142,7 +143,9 @@ class WyomingJarvisIntegration:
         if self.config['integration'].get('use_existing_ai', True):
             try:
                 from ..ai.orchestrator import AIOrchestrator
-                self.ai_orchestrator = AIOrchestrator()
+                from ..utils.config import ConfigManager
+                config_manager = ConfigManager()
+                self.ai_orchestrator = AIOrchestrator(config_manager)
                 self.logger.info("AI orchestrator initialized")
             except Exception as e:
                 self.logger.error(f"Failed to initialize AI orchestrator: {e}")
@@ -241,23 +244,27 @@ class WyomingJarvisIntegration:
             return None
 
         try:
-            # Generate speech with TTS engine
-            # This is a simplified version - you'll need to adapt to your TTS implementation
+            # For Step 1, we'll use a simple approach - generate TTS and send to Pi
+            # This bypasses Wyoming audio streaming for now and uses our proven method
+            import subprocess
+
+            # Generate TTS using macOS say command (matches your working pipeline)
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
                 temp_path = f.name
 
-            # Use your TTS to generate audio file
-            success = self.tts_engine.speak_to_file(text, temp_path)
+            # Use macOS say to generate audio
+            say_cmd = f'say "{text}" -o {temp_path}'
+            result = subprocess.run(say_cmd, shell=True, capture_output=True, text=True)
 
-            if success:
-                # Read the audio file and extract raw data
-                import wave
-                with wave.open(temp_path, 'rb') as wav_file:
-                    audio_data = wav_file.readframes(wav_file.getnframes())
+            if result.returncode == 0:
+                # Read the audio file
+                with open(temp_path, 'rb') as f:
+                    audio_data = f.read()
 
                 os.unlink(temp_path)
                 return audio_data
             else:
+                self.logger.error(f"TTS generation failed: {result.stderr}")
                 if os.path.exists(temp_path):
                     os.unlink(temp_path)
                 return None
@@ -265,6 +272,68 @@ class WyomingJarvisIntegration:
         except Exception as e:
             self.logger.error(f"TTS generation failed: {e}")
             return None
+
+    def send_tts_to_pi(self, text: str) -> bool:
+        """Send TTS directly to Pi speakers (Step 1 implementation).
+
+        Args:
+            text: Text to speak
+
+        Returns:
+            True if successful
+        """
+        try:
+            # Generate TTS on Mac using macOS say command
+            self.logger.info(f"🔊 Sending TTS to Pi: '{text}'")
+
+            # Create temporary audio file
+            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
+                temp_path = f.name
+
+            # Generate TTS audio using macOS say
+            say_cmd = f'say "{text}" -o {temp_path}'
+            result = subprocess.run(say_cmd, shell=True, capture_output=True, text=True)
+
+            if result.returncode == 0:
+                # Convert to format Pi can play
+                converted_path = temp_path.replace('.wav', '_converted.wav')
+                convert_cmd = f"afconvert {temp_path} -o {converted_path} -f WAVE -d LEI16@22050"
+                result = subprocess.run(convert_cmd, shell=True, capture_output=True, text=True)
+
+                if result.returncode == 0:
+                    # Send to Pi and play
+                    scp_cmd = f"scp {converted_path} lizard@alicegreen.local:/tmp/tts_response.wav"
+                    result = subprocess.run(scp_cmd, shell=True, capture_output=True, text=True)
+
+                    if result.returncode == 0:
+                        # Play on Pi speakers
+                        play_cmd = "ssh lizard@alicegreen.local 'aplay -D hw:2,0 /tmp/tts_response.wav'"
+                        subprocess.run(play_cmd, shell=True)
+                        self.logger.info("✅ TTS played on Pi speakers")
+
+                        # Cleanup
+                        if os.path.exists(temp_path):
+                            os.unlink(temp_path)
+                        if os.path.exists(converted_path):
+                            os.unlink(converted_path)
+                        return True
+                    else:
+                        self.logger.error("❌ Failed to send TTS to Pi")
+                else:
+                    self.logger.error("❌ Audio conversion failed")
+            else:
+                self.logger.error("❌ TTS generation failed")
+
+            # Cleanup on failure
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            if 'converted_path' in locals() and os.path.exists(converted_path):
+                os.unlink(converted_path)
+            return False
+
+        except Exception as e:
+            self.logger.error(f"❌ TTS to Pi failed: {e}")
+            return False
 
     async def start(self) -> None:
         """Start the Wyoming-Jarvis integration."""
