@@ -152,20 +152,17 @@ else
     cd "$OPENWAKEWORD_DIR"
 fi
 
-# Use the official setup script which creates its own venv
-echo "Running OpenWakeWord setup script..."
-if [ -f "script/setup" ]; then
-    bash script/setup
-else
-    # Fallback if script doesn't exist
-    if [ ! -d ".venv" ]; then
-        python3 -m venv .venv
-    fi
-    source .venv/bin/activate
-    pip install --upgrade pip wheel
-    pip install -e .
-    deactivate
+# Create venv and install (the official script/setup is Python, we do it manually)
+echo "Setting up OpenWakeWord..."
+if [ ! -d ".venv" ]; then
+    echo "Creating virtual environment for wyoming-openwakeword..."
+    python3 -m venv .venv
 fi
+
+source .venv/bin/activate
+pip install --upgrade pip wheel
+pip install -e .
+deactivate
 
 cd "$SCRIPT_DIR"
 echo -e "${GREEN}✓ Wyoming OpenWakeWord installed (venv: wyoming-openwakeword/.venv)${NC}"
