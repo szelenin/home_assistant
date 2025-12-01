@@ -1,6 +1,7 @@
 #!/bin/bash
 # Jarvis Satellite Installer for Raspberry Pi
 # This script installs all dependencies for running the Wyoming satellite
+# Supports both fresh install and updates
 
 set -e  # Exit on error
 
@@ -13,11 +14,54 @@ NC='\033[0m' # No Color
 
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"  # Parent directory (home_assistant repo)
 VENV_DIR="${SCRIPT_DIR}/venv"
 CONFIG_FILE="${SCRIPT_DIR}/config/satellite.conf"
 
-echo -e "${BLUE}=== Jarvis Satellite Installer ===${NC}"
+# =============================================================================
+# Detect install mode (fresh vs update)
+# =============================================================================
+IS_UPDATE=false
+if [ -d "$VENV_DIR" ] && [ -f "$VENV_DIR/bin/python" ]; then
+    IS_UPDATE=true
+fi
+
+if [ "$IS_UPDATE" = true ]; then
+    echo -e "${BLUE}=== Jarvis Satellite Updater ===${NC}"
+    echo -e "${YELLOW}Existing installation detected - running in UPDATE mode${NC}"
+else
+    echo -e "${BLUE}=== Jarvis Satellite Installer ===${NC}"
+    echo -e "${YELLOW}Fresh installation${NC}"
+fi
 echo ""
+
+# =============================================================================
+# Show current version (for updates)
+# =============================================================================
+if [ "$IS_UPDATE" = true ]; then
+    echo -e "${YELLOW}[0/8] Checking versions...${NC}"
+    echo "Current version before update:"
+    cd "$REPO_DIR"
+    BEFORE_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    BEFORE_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
+    echo "  Branch: $BEFORE_BRANCH"
+    echo "  Commit: $BEFORE_COMMIT"
+    echo ""
+
+    # Pull latest changes
+    echo "Pulling latest changes from git..."
+    GIT_PULL_OUTPUT=$(git pull 2>&1) || true
+    echo "$GIT_PULL_OUTPUT"
+
+    AFTER_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    if [ "$BEFORE_COMMIT" = "$AFTER_COMMIT" ]; then
+        echo -e "${GREEN}✓ Already up to date (commit: $AFTER_COMMIT)${NC}"
+    else
+        echo -e "${GREEN}✓ Updated from $BEFORE_COMMIT to $AFTER_COMMIT${NC}"
+    fi
+    cd "$SCRIPT_DIR"
+    echo ""
+fi
 
 # =============================================================================
 # STEP 1: Check Python version
@@ -53,23 +97,31 @@ sudo apt-get install -y \
 echo -e "${GREEN}✓ System dependencies installed${NC}"
 
 # =============================================================================
-# STEP 3: Create virtual environment
+# STEP 3: Create/verify virtual environment
 # =============================================================================
 echo ""
-echo -e "${YELLOW}[3/8] Creating Python virtual environment...${NC}"
+echo -e "${YELLOW}[3/8] Setting up Python virtual environment...${NC}"
 
-if [ -d "$VENV_DIR" ]; then
-    echo "Virtual environment already exists, recreating..."
-    rm -rf "$VENV_DIR"
+if [ "$IS_UPDATE" = true ] && [ -f "$VENV_DIR/bin/python" ]; then
+    echo "Using existing virtual environment..."
+    source "$VENV_DIR/bin/activate"
+    # Upgrade pip in case it's outdated
+    pip install --upgrade pip wheel
+    echo -e "${GREEN}✓ Virtual environment verified${NC}"
+else
+    if [ -d "$VENV_DIR" ]; then
+        echo "Virtual environment corrupted, recreating..."
+        rm -rf "$VENV_DIR"
+    fi
+
+    python3 -m venv "$VENV_DIR"
+    source "$VENV_DIR/bin/activate"
+
+    # Upgrade pip
+    pip install --upgrade pip wheel
+
+    echo -e "${GREEN}✓ Virtual environment created${NC}"
 fi
-
-python3 -m venv "$VENV_DIR"
-source "$VENV_DIR/bin/activate"
-
-# Upgrade pip
-pip install --upgrade pip wheel
-
-echo -e "${GREEN}✓ Virtual environment created${NC}"
 
 # =============================================================================
 # STEP 4: Install Wyoming satellite
@@ -200,8 +252,24 @@ fi
 # COMPLETE
 # =============================================================================
 echo ""
-echo -e "${GREEN}=== Installation Complete ===${NC}"
+if [ "$IS_UPDATE" = true ]; then
+    echo -e "${GREEN}=== Update Complete ===${NC}"
+else
+    echo -e "${GREEN}=== Installation Complete ===${NC}"
+fi
 echo ""
+
+# Show final version info
+cd "$REPO_DIR"
+FINAL_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+FINAL_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
+echo "Installed version:"
+echo "  Branch: $FINAL_BRANCH"
+echo "  Commit: $FINAL_COMMIT"
+echo "  Date:   $(git log -1 --format='%ci' 2>/dev/null || echo 'unknown')"
+cd "$SCRIPT_DIR"
+echo ""
+
 echo "Next steps:"
 echo "  1. Edit config/satellite.conf with your Mac's IP address:"
 echo "     nano config/satellite.conf"
