@@ -31,22 +31,38 @@ else
 fi
 
 # =============================================================================
-# Check Virtual Environment
+# Check Component Installations (separate venvs)
 # =============================================================================
 echo ""
-echo -e "${YELLOW}[Virtual Environment]${NC}"
-if [ -d "${SCRIPT_DIR}/venv" ]; then
+echo -e "${YELLOW}[Wyoming Satellite]${NC}"
+SATELLITE_DIR="${SCRIPT_DIR}/wyoming-satellite"
+if [ -d "${SATELLITE_DIR}/.venv" ]; then
     echo -e "  ${GREEN}✓${NC} venv exists"
-
-    # Check if wyoming is installed
-    if "${SCRIPT_DIR}/venv/bin/pip" show wyoming-satellite &> /dev/null; then
-        VERSION=$("${SCRIPT_DIR}/venv/bin/pip" show wyoming-satellite | grep Version | cut -d' ' -f2)
-        echo -e "  ${GREEN}✓${NC} wyoming-satellite $VERSION"
+    if "${SATELLITE_DIR}/.venv/bin/pip" show wyoming-satellite &> /dev/null; then
+        VERSION=$("${SATELLITE_DIR}/.venv/bin/pip" show wyoming-satellite | grep Version | cut -d' ' -f2)
+        WYOMING_VER=$("${SATELLITE_DIR}/.venv/bin/pip" show wyoming | grep Version | cut -d' ' -f2)
+        echo -e "  ${GREEN}✓${NC} wyoming-satellite $VERSION (wyoming $WYOMING_VER)"
     else
         echo -e "  ${RED}✗${NC} wyoming-satellite not installed"
     fi
 else
-    echo -e "  ${RED}✗ venv not found - run ./install.sh${NC}"
+    echo -e "  ${RED}✗ Not installed - run ./install.sh${NC}"
+fi
+
+echo ""
+echo -e "${YELLOW}[Wyoming OpenWakeWord]${NC}"
+OPENWAKEWORD_DIR="${SCRIPT_DIR}/wyoming-openwakeword"
+if [ -d "${OPENWAKEWORD_DIR}/.venv" ]; then
+    echo -e "  ${GREEN}✓${NC} venv exists"
+    if "${OPENWAKEWORD_DIR}/.venv/bin/pip" show wyoming-openwakeword &> /dev/null; then
+        VERSION=$("${OPENWAKEWORD_DIR}/.venv/bin/pip" show wyoming-openwakeword | grep Version | cut -d' ' -f2)
+        WYOMING_VER=$("${OPENWAKEWORD_DIR}/.venv/bin/pip" show wyoming | grep Version | cut -d' ' -f2)
+        echo -e "  ${GREEN}✓${NC} wyoming-openwakeword $VERSION (wyoming $WYOMING_VER)"
+    else
+        echo -e "  ${RED}✗${NC} wyoming-openwakeword not installed"
+    fi
+else
+    echo -e "  ${RED}✗ Not installed - run ./install.sh${NC}"
 fi
 
 # =============================================================================

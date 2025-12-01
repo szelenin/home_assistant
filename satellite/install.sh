@@ -2,6 +2,9 @@
 # Jarvis Satellite Installer for Raspberry Pi
 # This script installs all dependencies for running the Wyoming satellite
 # Supports both fresh install and updates
+#
+# IMPORTANT: wyoming-satellite and wyoming-openwakeword use SEPARATE virtual
+# environments to avoid dependency conflicts (they require different wyoming versions)
 
 set -e  # Exit on error
 
@@ -15,14 +18,17 @@ NC='\033[0m' # No Color
 # Script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"  # Parent directory (home_assistant repo)
-VENV_DIR="${SCRIPT_DIR}/venv"
 CONFIG_FILE="${SCRIPT_DIR}/config/satellite.conf"
+
+# Separate directories for each component (to avoid dependency conflicts)
+SATELLITE_DIR="${SCRIPT_DIR}/wyoming-satellite"
+OPENWAKEWORD_DIR="${SCRIPT_DIR}/wyoming-openwakeword"
 
 # =============================================================================
 # Detect install mode (fresh vs update)
 # =============================================================================
 IS_UPDATE=false
-if [ -d "$VENV_DIR" ] && [ -f "$VENV_DIR/bin/python" ]; then
+if [ -d "$SATELLITE_DIR/.venv" ] && [ -f "$SATELLITE_DIR/.venv/bin/python" ]; then
     IS_UPDATE=true
 fi
 
@@ -97,70 +103,85 @@ sudo apt-get install -y \
 echo -e "${GREEN}✓ System dependencies installed${NC}"
 
 # =============================================================================
-# STEP 3: Create/verify virtual environment
+# STEP 3: Clone/update wyoming-satellite (separate venv)
 # =============================================================================
 echo ""
-echo -e "${YELLOW}[3/8] Setting up Python virtual environment...${NC}"
+echo -e "${YELLOW}[3/8] Installing Wyoming satellite...${NC}"
+echo -e "${BLUE}Note: Using separate venv to avoid dependency conflicts${NC}"
 
-if [ "$IS_UPDATE" = true ] && [ -f "$VENV_DIR/bin/python" ]; then
-    echo "Using existing virtual environment..."
-    source "$VENV_DIR/bin/activate"
-    # Upgrade pip in case it's outdated
-    pip install --upgrade pip wheel
-    echo -e "${GREEN}✓ Virtual environment verified${NC}"
+if [ -d "$SATELLITE_DIR" ]; then
+    echo "Wyoming-satellite directory exists, updating..."
+    cd "$SATELLITE_DIR"
+    git fetch origin
+    git pull || true
 else
-    if [ -d "$VENV_DIR" ]; then
-        echo "Virtual environment corrupted, recreating..."
-        rm -rf "$VENV_DIR"
-    fi
-
-    python3 -m venv "$VENV_DIR"
-    source "$VENV_DIR/bin/activate"
-
-    # Upgrade pip
-    pip install --upgrade pip wheel
-
-    echo -e "${GREEN}✓ Virtual environment created${NC}"
+    echo "Cloning wyoming-satellite..."
+    git clone https://github.com/rhasspy/wyoming-satellite.git "$SATELLITE_DIR"
+    cd "$SATELLITE_DIR"
 fi
 
+# Create/update venv for satellite
+if [ ! -d ".venv" ]; then
+    echo "Creating virtual environment for wyoming-satellite..."
+    python3 -m venv .venv
+fi
+
+source .venv/bin/activate
+pip install --upgrade pip wheel
+pip install -e .
+deactivate
+
+cd "$SCRIPT_DIR"
+echo -e "${GREEN}✓ Wyoming satellite installed (venv: wyoming-satellite/.venv)${NC}"
+
 # =============================================================================
-# STEP 4: Install Wyoming satellite
+# STEP 4: Clone/update wyoming-openwakeword (separate venv)
 # =============================================================================
 echo ""
-echo -e "${YELLOW}[4/8] Installing Wyoming satellite...${NC}"
-
-pip install wyoming wyoming-satellite
-
-echo -e "${GREEN}✓ Wyoming satellite installed${NC}"
-
-# =============================================================================
-# STEP 5: Install Wyoming OpenWakeWord
-# =============================================================================
-echo ""
-echo -e "${YELLOW}[5/8] Installing Wyoming OpenWakeWord...${NC}"
-
-# Clone the repository for the latest version with hey_jarvis model
-OPENWAKEWORD_DIR="${SCRIPT_DIR}/wyoming-openwakeword"
+echo -e "${YELLOW}[4/8] Installing Wyoming OpenWakeWord...${NC}"
+echo -e "${BLUE}Note: Using separate venv to avoid dependency conflicts${NC}"
 
 if [ -d "$OPENWAKEWORD_DIR" ]; then
     echo "OpenWakeWord directory exists, updating..."
     cd "$OPENWAKEWORD_DIR"
+    git fetch origin
     git pull || true
 else
+    echo "Cloning wyoming-openwakeword..."
     git clone https://github.com/rhasspy/wyoming-openwakeword.git "$OPENWAKEWORD_DIR"
     cd "$OPENWAKEWORD_DIR"
 fi
 
-# Install in the virtual environment
-pip install -e .
-
-# Download models
-echo "Downloading wake word models..."
-pip install openwakeword
+# Use the official setup script which creates its own venv
+echo "Running OpenWakeWord setup script..."
+if [ -f "script/setup" ]; then
+    bash script/setup
+else
+    # Fallback if script doesn't exist
+    if [ ! -d ".venv" ]; then
+        python3 -m venv .venv
+    fi
+    source .venv/bin/activate
+    pip install --upgrade pip wheel
+    pip install -e .
+    deactivate
+fi
 
 cd "$SCRIPT_DIR"
+echo -e "${GREEN}✓ Wyoming OpenWakeWord installed (venv: wyoming-openwakeword/.venv)${NC}"
 
-echo -e "${GREEN}✓ Wyoming OpenWakeWord installed${NC}"
+# =============================================================================
+# STEP 5: Download wake word models
+# =============================================================================
+echo ""
+echo -e "${YELLOW}[5/8] Downloading wake word models...${NC}"
+
+# Use openwakeword's venv to download models
+source "$OPENWAKEWORD_DIR/.venv/bin/activate"
+pip install openwakeword 2>/dev/null || true
+deactivate
+
+echo -e "${GREEN}✓ Wake word models available${NC}"
 
 # =============================================================================
 # STEP 6: Detect audio devices
@@ -235,10 +256,52 @@ if [ "$1" = "--systemd" ]; then
     echo "Installing systemd services..."
 
     # Update service files with correct paths
-    sed -i "s|/home/pi/satellite|${SCRIPT_DIR}|g" "${SCRIPT_DIR}/systemd/wyoming-openwakeword.service"
-    sed -i "s|/home/pi/satellite|${SCRIPT_DIR}|g" "${SCRIPT_DIR}/systemd/wyoming-satellite.service"
+    SYSTEMD_DIR="${SCRIPT_DIR}/systemd"
 
-    sudo cp "${SCRIPT_DIR}/systemd/"*.service /etc/systemd/system/
+    # Create updated service files
+    cat > "${SYSTEMD_DIR}/wyoming-openwakeword.service" << EOF
+[Unit]
+Description=Wyoming OpenWakeWord
+After=network.target
+
+[Service]
+Type=simple
+User=$(whoami)
+WorkingDirectory=${OPENWAKEWORD_DIR}
+ExecStart=${OPENWAKEWORD_DIR}/.venv/bin/python -m wyoming_openwakeword --uri tcp://127.0.0.1:10400 --preload-model hey_jarvis
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    cat > "${SYSTEMD_DIR}/wyoming-satellite.service" << EOF
+[Unit]
+Description=Wyoming Satellite
+After=network.target wyoming-openwakeword.service
+Requires=wyoming-openwakeword.service
+
+[Service]
+Type=simple
+User=$(whoami)
+EnvironmentFile=${CONFIG_FILE}
+WorkingDirectory=${SATELLITE_DIR}
+ExecStart=${SATELLITE_DIR}/.venv/bin/python -m wyoming_satellite \\
+    --name \${SATELLITE_NAME} \\
+    --uri tcp://0.0.0.0:10700 \\
+    --mic-command "arecord -D \${MIC_DEVICE} -r 16000 -c 1 -f S16_LE -t raw" \\
+    --snd-command "aplay -D \${SPEAKER_DEVICE} -r 22050 -c 1 -f S16_LE -t raw" \\
+    --wake-uri \${WAKE_WORD_URI} \\
+    --wake-word-name \${WAKE_WORD_NAME}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    sudo cp "${SYSTEMD_DIR}/"*.service /etc/systemd/system/
     sudo systemctl daemon-reload
     sudo systemctl enable wyoming-openwakeword
     sudo systemctl enable wyoming-satellite
@@ -268,6 +331,14 @@ echo "  Branch: $FINAL_BRANCH"
 echo "  Commit: $FINAL_COMMIT"
 echo "  Date:   $(git log -1 --format='%ci' 2>/dev/null || echo 'unknown')"
 cd "$SCRIPT_DIR"
+echo ""
+
+# Show component versions
+echo "Component versions:"
+echo "  wyoming-satellite: $($SATELLITE_DIR/.venv/bin/pip show wyoming-satellite 2>/dev/null | grep Version | cut -d' ' -f2 || echo 'unknown')"
+echo "  wyoming (satellite): $($SATELLITE_DIR/.venv/bin/pip show wyoming 2>/dev/null | grep Version | cut -d' ' -f2 || echo 'unknown')"
+echo "  wyoming-openwakeword: $($OPENWAKEWORD_DIR/.venv/bin/pip show wyoming-openwakeword 2>/dev/null | grep Version | cut -d' ' -f2 || echo 'unknown')"
+echo "  wyoming (openwakeword): $($OPENWAKEWORD_DIR/.venv/bin/pip show wyoming 2>/dev/null | grep Version | cut -d' ' -f2 || echo 'unknown')"
 echo ""
 
 echo "Next steps:"
