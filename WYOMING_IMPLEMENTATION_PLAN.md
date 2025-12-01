@@ -149,19 +149,19 @@ The processing logic moves to `VoiceProcessor`. `event_bridge.py` becomes a thin
 
 ### Acceptance Criteria
 
-**All criteria must pass on real hardware:**
+**All criteria must pass on real hardware.**
 
-| # | Test Case | Expected Result | Pass/Fail |
-|---|-----------|-----------------|-----------|
-| 1.1 | Run `./install.sh` on fresh Raspberry Pi | Completes without errors, all dependencies installed | ☐ |
-| 1.2 | Run `./check_status.sh` | All checks green (Python, venv, audio devices, network) | ☐ |
-| 1.3 | Run `./run.sh` on Pi while Mac server running | Pi connects to Mac, logs show "Satellite connected" | ☐ |
-| 1.4 | Say "Jarvis" clearly | Pi stops listening, Mac logs show audio streaming | ☐ |
-| 1.5 | After "Jarvis", hear "Yes?" | "Yes?" plays on Pi speakers within 1 second | ☐ |
-| 1.6 | Say "What time is it?" | AI responds with current time, plays on Pi speakers | ☐ |
-| 1.7 | Say "What's the weather in Tampa?" | AI orchestrator calls weather API, response plays on Pi | ☐ |
-| 1.8 | Run `./stop.sh` | Services stop cleanly, no orphan processes | ☐ |
-| 1.9 | Reboot Pi (with systemd services enabled) | Satellite auto-starts and connects to Mac | ☐ |
+| # | Test Case | Expected Result | Verification | Pass/Fail |
+|---|-----------|-----------------|--------------|-----------|
+| 1.1 | Run `./install.sh` on fresh Raspberry Pi | Completes without errors, all dependencies installed | **Check:** Script output shows green ✓ for each step. Final message says "Installation Complete". Run `./venv/bin/pip list \| grep wyoming` shows wyoming packages. | ☐ |
+| 1.2 | Run `./check_status.sh` | All checks green (Python, venv, audio devices, network) | **Check:** Script output shows ✓ for Python, venv, mic device, speaker device, and network. No ✗ marks. | ☐ |
+| 1.3 | Run `./run.sh` on Pi while Mac server running | Pi connects to Mac, logs show "Satellite connected" | **Check on Mac:** Terminal running Wyoming server shows log line containing "Satellite connected" or "client_X connected". **Check on Pi:** run.sh output shows "Connecting to MAC_SERVER_IP:10700". | ☐ |
+| 1.4 | Say "Jarvis" clearly | Pi detects wake word, Mac receives audio stream | **Check on Pi:** Logs show "Wake word detected" or similar. **Check on Mac:** Logs show "Audio streaming started" or "AudioStart received". | ☐ |
+| 1.5 | After "Jarvis", hear "Yes?" | "Yes?" plays on Pi speakers within 1 second | **Check:** Audibly hear "Yes?" from Pi speakers. **Check on Mac:** Logs show "Generated TTS audio" and "Sending TTS audio to satellite". | ☐ |
+| 1.6 | Say "What time is it?" | AI responds with current time, plays on Pi speakers | **Check:** Audibly hear spoken time from Pi speakers. Time is reasonably accurate. **Check on Mac:** Logs show transcript "what time is it" and AI response containing time. | ☐ |
+| 1.7 | Say "What's the weather in Tampa?" | AI orchestrator calls weather API, response plays on Pi | **Check:** Audibly hear weather info from Pi speakers (temperature, conditions). **Check on Mac:** Logs show "AI Response" containing weather data. | ☐ |
+| 1.8 | Run `./stop.sh` | Services stop cleanly, no orphan processes | **Check:** Run `ps aux \| grep -E "wyoming\|openwakeword"` on Pi - no processes found. Run `./check_status.sh` shows services stopped. | ☐ |
+| 1.9 | Reboot Pi (with systemd services enabled) | Satellite auto-starts and connects to Mac | **Check:** After reboot, run `systemctl status wyoming-satellite` shows "active (running)". Mac logs show satellite reconnected. | ☐ |
 
 ### Implementation Details
 
