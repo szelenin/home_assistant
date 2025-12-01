@@ -1,0 +1,22 @@
+[Unit]
+Description=Wyoming Satellite Service
+After=network.target wyoming-openwakeword.service
+Requires=wyoming-openwakeword.service
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/satellite
+EnvironmentFile=/home/pi/satellite/config/satellite.conf
+ExecStart=/home/pi/satellite/venv/bin/python -m wyoming_satellite \
+    --name ${SATELLITE_NAME} \
+    --uri tcp://${MAC_SERVER_IP}:${MAC_SERVER_PORT} \
+    --mic-command "arecord -D ${MIC_DEVICE} -r 16000 -c 1 -f S16_LE -t raw" \
+    --snd-command "aplay -D ${SPEAKER_DEVICE} -r 22050 -c 1 -f S16_LE -t raw" \
+    --wake-uri ${WAKE_WORD_URI} \
+    --wake-word-name ${WAKE_WORD_NAME}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -59,23 +59,32 @@ Your Mac will now listen on port 10700 for satellite connections.
 
 #### 2. Satellite Setup (Raspberry Pi)
 
+For complete satellite setup with automated installation, see **[satellite/README.md](satellite/README.md)**.
+
+**Quick Start:**
 ```bash
-# Install Wyoming-satellite
-git clone https://github.com/rhasspy/wyoming-satellite.git
-cd wyoming-satellite
-script/setup
+# From your Mac, copy the satellite folder to Pi
+scp -r satellite/ pi@your-pi-hostname:~/
 
-# Configure audio devices
-arecord -L  # List microphones
-aplay -L    # List speakers
+# SSH to Pi and run the installer
+ssh pi@your-pi-hostname
+cd ~/satellite
+./install.sh
 
-# Run satellite (replace with your Mac's IP and audio devices)
-script/run \
-  --name 'kitchen-satellite' \
-  --uri 'tcp://YOUR_MAC_IP:10700' \
-  --mic-command 'arecord -D plughw:1,0 -r 16000 -c 1 -f S16_LE -t raw' \
-  --snd-command 'aplay -D plughw:1,0 -r 22050 -c 1 -f S16_LE -t raw'
+# Configure with your Mac's IP
+nano config/satellite.conf
+# Set: MAC_SERVER_IP="your-mac-ip"
+
+# Start the satellite
+./run.sh
 ```
+
+The `satellite/` folder includes:
+- **install.sh** - One-command installation
+- **run.sh** - Start satellite services
+- **stop.sh** - Stop satellite services
+- **check_status.sh** - Health check
+- **systemd/** - Auto-start services
 
 #### 3. Test the System
 
@@ -144,27 +153,12 @@ wyoming:
 
 #### Local Wake Word Detection
 
-For even better performance, run wake word detection locally on each Pi:
+The `satellite/` folder includes local wake word detection by default. The installer (`install.sh`) automatically:
+1. Installs wyoming-openwakeword
+2. Downloads the "hey_jarvis" wake word model
+3. Configures the satellite to use local wake word detection
 
-```bash
-# Install OpenWakeWord on Pi
-cd wyoming-satellite
-git clone https://github.com/rhasspy/wyoming-openwakeword.git
-cd wyoming-openwakeword
-script/setup
-
-# Run wake word service
-script/run --uri 'tcp://127.0.0.1:10400'
-
-# Update satellite to use local wake word
-script/run \
-  --name 'kitchen-satellite' \
-  --uri 'tcp://YOUR_MAC_IP:10700' \
-  --wake-uri 'tcp://127.0.0.1:10400' \
-  --wake-word-name 'jarvis' \
-  --mic-command 'arecord -D plughw:1,0 -r 16000 -c 1 -f S16_LE -t raw' \
-  --snd-command 'aplay -D plughw:1,0 -r 22050 -c 1 -f S16_LE -t raw'
-```
+For manual configuration or customization, see **[satellite/README.md](satellite/README.md)**.
 
 #### LED Indicators
 
@@ -229,7 +223,8 @@ htop
 
 ### Documentation
 
-- **📖 Complete Setup Guide**: [WYOMING_INTEGRATION.md](WYOMING_INTEGRATION.md)
+- **🔧 Satellite Setup**: [satellite/README.md](satellite/README.md) - Complete Pi satellite installation
+- **📖 Implementation Plan**: [WYOMING_IMPLEMENTATION_PLAN.md](WYOMING_IMPLEMENTATION_PLAN.md) - Phased rollout plan
 - **🔧 Server API Reference**: `home_assistant/wyoming/`
 - **🧪 Test Scripts**: `test_wyoming_server.py`, `test_wyoming_client.py`
 - **⚙️ Configuration Reference**: `config/wyoming.yaml`

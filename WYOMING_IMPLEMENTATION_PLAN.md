@@ -14,12 +14,24 @@ This plan implements distributed voice assistant with **incrementally testable p
 
 | Phase | Status | Started | Completed | Notes |
 |-------|--------|---------|-----------|-------|
-| 1 | 🔲 Not Started | - | - | Pi satellite + full voice pipeline |
+| 1 | 🔄 In Progress | 2025-11-30 | - | Pi satellite + full voice pipeline |
 | 2 | 🔲 Not Started | - | - | Unified entry point + core refactor |
 | 3 | 🔲 Not Started | - | - | Dual mode (Mac + Pi wake word) |
 | 4 | 🔲 Not Started | - | - | Pi interruption during TTS |
 
 **Status Legend:** 🔲 Not Started | 🔄 In Progress | ✅ Complete | ⏸️ Blocked
+
+### Phase 1 Progress
+- [x] Create satellite/ folder structure
+- [x] Create satellite/README.md with installation guide
+- [x] Create satellite/install.sh installer script
+- [x] Create satellite/run.sh start script
+- [x] Create satellite/stop.sh and check_status.sh
+- [x] Create satellite/config/satellite.conf template
+- [x] Create satellite/systemd/ service files
+- [x] Wire up event_bridge.py with real STT/AI/TTS components (TTS generation implemented)
+- [x] Update root README.md with satellite setup section
+- [ ] **TESTING** - Run acceptance criteria on real hardware
 
 ---
 

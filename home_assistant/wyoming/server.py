@@ -251,7 +251,9 @@ class WyomingServer:
         if client.audio_handler:
             audio_data = await client.audio_handler.get_complete_audio()
 
-            # Process complete audio through Home Assistant
+            self.logger.info(f"Processing {len(audio_data)} bytes of audio from {client.client_id}")
+
+            # Process complete audio through Home Assistant (STT -> AI -> TTS)
             result = await self.event_bridge.on_audio_complete(
                 client.client_id,
                 audio_data,
@@ -264,6 +266,18 @@ class WyomingServer:
             if result and result.get('transcript'):
                 transcript = Transcript(text=result['transcript'])
                 await async_write_event(transcript, client.writer)
+                self.logger.info(f"Sent transcript: {result['transcript'][:50]}...")
+
+            # Send TTS audio back to satellite for playback
+            if result and result.get('tts_audio'):
+                self.logger.info(f"Sending TTS audio to satellite: {len(result['tts_audio'])} bytes")
+                await self._send_tts_audio(client, result['tts_audio'])
+            elif result and result.get('ai_response'):
+                # If we have AI response but no TTS audio, generate it now
+                self.logger.info("Generating TTS for AI response...")
+                tts_audio = self.event_bridge._generate_tts_sync(result['ai_response'])
+                if tts_audio:
+                    await self._send_tts_audio(client, tts_audio)
 
             client.audio_handler = None
 

@@ -334,19 +334,80 @@ class EventBridge:
             self.logger.error(f"TTS generation failed: {e}")
             return None
 
-    def _generate_tts_sync(self, text: str, target_rate: int) -> bytes:
-        """Synchronous TTS generation.
+    def _generate_tts_sync(self, text: str, target_rate: int = 22050) -> bytes:
+        """Synchronous TTS generation using macOS say command.
 
         Args:
             text: Text to synthesize
-            target_rate: Target sample rate
+            target_rate: Target sample rate (default 22050 for Wyoming)
 
         Returns:
-            Raw audio data
+            Raw PCM audio data (16-bit, mono)
         """
-        # This is a placeholder - you'll need to integrate with your actual TTS
-        # For now, return empty audio
-        return b''
+        import subprocess
+        import tempfile
+        import os
+
+        try:
+            # Create temporary files
+            with tempfile.NamedTemporaryFile(suffix='.aiff', delete=False) as f:
+                aiff_path = f.name
+            wav_path = aiff_path.replace('.aiff', '.wav')
+
+            # Escape quotes in text for shell command
+            safe_text = text.replace('"', '\\"').replace("'", "\\'")
+
+            # Generate with macOS say command
+            say_result = subprocess.run(
+                ['say', '-o', aiff_path, safe_text],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            if say_result.returncode != 0:
+                self.logger.error(f"TTS say command failed: {say_result.stderr}")
+                return b''
+
+            # Convert to WAV format (16-bit, target rate, mono)
+            convert_result = subprocess.run(
+                ['afconvert', aiff_path, '-o', wav_path, '-f', 'WAVE', '-d', f'LEI16@{target_rate}'],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            if convert_result.returncode != 0:
+                self.logger.error(f"Audio conversion failed: {convert_result.stderr}")
+                return b''
+
+            # Read WAV file and extract raw PCM data (skip 44-byte WAV header)
+            with open(wav_path, 'rb') as f:
+                wav_data = f.read()
+                # Skip WAV header (44 bytes) to get raw PCM
+                pcm_data = wav_data[44:]
+
+            self.logger.info(f"Generated TTS audio: {len(pcm_data)} bytes")
+            return pcm_data
+
+        except subprocess.TimeoutExpired:
+            self.logger.error("TTS generation timed out")
+            return b''
+        except Exception as e:
+            self.logger.error(f"TTS generation failed: {e}")
+            return b''
+        finally:
+            # Cleanup temporary files
+            try:
+                if 'aiff_path' in dir() and os.path.exists(aiff_path):
+                    os.unlink(aiff_path)
+            except:
+                pass
+            try:
+                if 'wav_path' in dir() and os.path.exists(wav_path):
+                    os.unlink(wav_path)
+            except:
+                pass
 
     def _convert_to_wav(
         self,
