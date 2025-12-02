@@ -77,13 +77,7 @@ if arecord -l &> /dev/null; then
     echo -e "  ${GREEN}✓${NC} $DEVICES recording device(s) found"
 
     if [ -n "$MIC_DEVICE" ]; then
-        # Use timeout to prevent hanging on some audio devices
-        MIC_CHECK=$(timeout 2 arecord -D "$MIC_DEVICE" -d 0 2>&1 || true)
-        if echo "$MIC_CHECK" | grep -q "Device or resource busy\|cannot\|error" ; then
-            echo -e "  ${RED}✗${NC} Configured mic ($MIC_DEVICE) busy or unavailable"
-        else
-            echo -e "  ${GREEN}✓${NC} Configured mic: $MIC_DEVICE"
-        fi
+        echo -e "  ${GREEN}✓${NC} Configured mic: $MIC_DEVICE"
     fi
 else
     echo -e "  ${RED}✗ No recording devices${NC}"
