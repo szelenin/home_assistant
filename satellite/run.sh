@@ -103,10 +103,13 @@ echo "  Speaker: ${SPEAKER_DEVICE:-plughw:2,0}"
 echo ""
 
 # Build satellite command arguments
+# --uri is where satellite listens for local connections
+# --event-uri is where satellite forwards events (our Mac server)
 SATELLITE_ARGS=(
     -m wyoming_satellite
     --name "${SATELLITE_NAME:-jarvis-pi}"
-    --uri "tcp://${MAC_SERVER_IP}:${MAC_SERVER_PORT:-10700}"
+    --uri "tcp://0.0.0.0:10700"
+    --event-uri "tcp://${MAC_SERVER_IP}:${MAC_SERVER_PORT:-10700}"
     --mic-command "arecord -D ${MIC_DEVICE:-plughw:2,0} -r 16000 -c 1 -f S16_LE -t raw"
     --snd-command "aplay -D ${SPEAKER_DEVICE:-plughw:2,0} -r 22050 -c 1 -f S16_LE -t raw"
     --wake-uri "${WAKE_WORD_URI:-tcp://127.0.0.1:10400}"
